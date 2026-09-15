@@ -281,13 +281,14 @@ async function resolveFacebook(parsed, originalUrl) {
   }
   if (parsed.kind === 'profile' && parsed.username) {
     const h = parsed.username;
-    candidates.push(`https://www.facebook.com/${h}/videos`);
     candidates.push(`https://www.facebook.com/${h}/reels`);
+    candidates.push(`https://www.facebook.com/${h}/videos`);
     candidates.push(`https://www.facebook.com/${h}`);
   }
   if (!candidates.length) candidates.push(originalUrl);
 
   const errors = [];
+  let imageFallback = null;
   for (const url of candidates) {
     try {
       const res = await fetchText(url);
@@ -297,13 +298,12 @@ async function resolveFacebook(parsed, originalUrl) {
       }
       const items = extractMediaUrls(res.text);
       const videos = items.filter((i) => i.type === 'video' || i.url.includes('.mp4'));
-      const usable = videos.length ? videos : items;
-      if (usable.length) {
+      if (videos.length) {
         return {
           ok: true,
           platform: 'facebook',
           kind: parsed.kind === 'profile' ? 'page' : parsed.kind,
-          items: usable.slice(0, 16).map((i) => ({
+          items: videos.slice(0, 20).map((i) => ({
             ...i,
             username: parsed.username || parsed.pageId || '',
             source: 'facebook-html',
@@ -312,10 +312,26 @@ async function resolveFacebook(parsed, originalUrl) {
           viaUrl: url,
         };
       }
-      errors.push(`${url} → no media in HTML`);
+      if (!imageFallback && items.length) imageFallback = items;
+      errors.push(`${url} → no mp4 in HTML`);
     } catch (e) {
       errors.push(`${url} → ${e && e.message ? e.message : e}`);
     }
+  }
+
+  if (imageFallback) {
+    return {
+      ok: true,
+      platform: 'facebook',
+      kind: 'page',
+      items: imageFallback.slice(0, 16).map((i) => ({
+        ...i,
+        username: parsed.username || '',
+        source: 'facebook-html',
+      })),
+      source: 'html-extract',
+      hint: 'Photos only — no progressive videos in public HTML.',
+    };
   }
 
   return {

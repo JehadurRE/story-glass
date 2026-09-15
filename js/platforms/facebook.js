@@ -119,8 +119,8 @@ function buildCandidateUrls(parsed) {
     }
   }
   if (kind === 'profile' && username) {
-    candidates.push(`https://www.facebook.com/${username}/videos`);
     candidates.push(`https://www.facebook.com/${username}/reels`);
+    candidates.push(`https://www.facebook.com/${username}/videos`);
     candidates.push(`https://www.facebook.com/${username}`);
   }
   if (!candidates.length && (normalized || original)) candidates.push(normalized || original);

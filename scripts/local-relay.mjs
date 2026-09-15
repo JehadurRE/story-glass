@@ -178,30 +178,42 @@ async function resolveFacebook(parsed, originalUrl) {
   }
   if (parsed.kind === 'profile' && parsed.username) {
     const h = parsed.username;
-    candidates.push(`https://www.facebook.com/${h}/videos`);
+    // reels often hold progressive mp4s; /videos may only be thumbnails
     candidates.push(`https://www.facebook.com/${h}/reels`);
+    candidates.push(`https://www.facebook.com/${h}/videos`);
     candidates.push(`https://www.facebook.com/${h}`);
   }
   if (!candidates.length) candidates.push(originalUrl);
 
+  let imageFallback = null;
   for (const url of candidates) {
     try {
       const res = await fetchText(url);
       const items = extractMediaUrls(res.text);
       const videos = items.filter((i) => i.type === 'video' || i.url.includes('.mp4'));
-      const usable = videos.length ? videos : items;
-      if (usable.length) {
+      if (videos.length) {
         return {
           ok: true,
           platform: 'facebook',
-          items: usable.slice(0, 16).map((i) => ({ ...i, source: 'facebook-html' })),
+          items: videos.slice(0, 20).map((i) => ({ ...i, source: 'facebook-html' })),
           source: 'html-extract',
           viaUrl: url,
         };
       }
+      if (!imageFallback && items.length) imageFallback = { items, viaUrl: url };
     } catch {
       /* next */
     }
+  }
+  if (imageFallback) {
+    return {
+      ok: true,
+      platform: 'facebook',
+      items: imageFallback.items.slice(0, 16).map((i) => ({ ...i, source: 'facebook-html' })),
+      source: 'html-extract',
+      viaUrl: imageFallback.viaUrl,
+      hint: 'Photos only — no progressive videos in public HTML.',
+    };
   }
   return { ok: false, platform: 'facebook', error: 'No Facebook media extracted' };
 }

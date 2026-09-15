@@ -240,11 +240,11 @@ async function resolveFacebook(parsed, originalUrl) {
     }
   }
 
-  // Page / profile: load the page, then its videos tab (where mp4s actually live)
+  // Page / profile: try videos + reels; prefer actual mp4s over thumbnails
   const handle = pageHandleFromUrl(originalUrl);
   if (handle) {
-    candidates.push(`https://www.facebook.com/${handle}/videos`);
     candidates.push(`https://www.facebook.com/${handle}/reels`);
+    candidates.push(`https://www.facebook.com/${handle}/videos`);
     candidates.push(`https://www.facebook.com/${handle}`);
   }
 
@@ -252,6 +252,7 @@ async function resolveFacebook(parsed, originalUrl) {
 
   const errors = [];
   let pageMeta = null;
+  let imageFallback = null;
 
   for (const url of candidates) {
     try {
@@ -262,22 +263,40 @@ async function resolveFacebook(parsed, originalUrl) {
       }
       const items = extractMediaUrls(res.text);
       const videos = items.filter((i) => i.type === 'video' || i.url.includes('.mp4'));
-      const usable = videos.length ? videos : items;
-      if (usable.length) {
+      if (videos.length) {
         return {
           ok: true,
           platform: 'facebook',
           kind: parsed.kind === 'profile' || !parsed.kind ? 'page' : parsed.kind,
-          items: usable.slice(0, 16).map((i) => ({ ...i, source: 'facebook-html' })),
+          items: videos.slice(0, 20).map((i) => ({ ...i, source: 'facebook-html' })),
           source: 'html-extract',
           viaUrl: url,
           page: pageMeta,
         };
       }
-      errors.push(`${url} → HTTP ${res.status}, no media`);
+      if (!imageFallback && items.length) {
+        imageFallback = {
+          items: items.slice(0, 16).map((i) => ({ ...i, source: 'facebook-html' })),
+          viaUrl: url,
+        };
+      }
+      errors.push(`${url} → HTTP ${res.status}, no mp4`);
     } catch (e) {
       errors.push(`${url} → ${e && e.message ? e.message : e}`);
     }
+  }
+
+  if (imageFallback) {
+    return {
+      ok: true,
+      platform: 'facebook',
+      kind: 'page',
+      items: imageFallback.items,
+      source: 'html-extract',
+      viaUrl: imageFallback.viaUrl,
+      page: pageMeta,
+      hint: 'Photos only — this page’s public HTML had no progressive videos.',
+    };
   }
 
   if (pageMeta && pageMeta.image) {
