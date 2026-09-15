@@ -2,16 +2,15 @@ import { parseUrl, parseManualPayload, PLATFORMS } from './parser.js';
 import { resolveInstagram } from './platforms/instagram.js';
 import { resolveFacebook } from './platforms/facebook.js';
 import { StoryPlayer, downloadMedia } from './player.js';
-import { loadSettings, saveSettings, listRoutesSummary } from './fetcher.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 const els = {
   form: $('#lookup-form'),
   input: $('#url-input'),
   clearBtn: $('#clear-input'),
   pasteBtn: $('#paste-clip'),
+  submitBtn: $('#submit-btn'),
   result: $('#result'),
   status: $('#status'),
   player: $('#story-player'),
@@ -27,13 +26,6 @@ const els = {
   manualPanel: $('#manual-panel'),
   manualText: $('#manual-text'),
   manualSubmit: $('#manual-submit'),
-  settingsToggle: $('#settings-toggle'),
-  settingsPanel: $('#settings-panel'),
-  relayInput: $('#relay-input'),
-  useRelay: $('#use-relay'),
-  useProxies: $('#use-proxies'),
-  settingsSave: $('#settings-save'),
-  routesList: $('#routes-list'),
   demoBtn: $('#demo-load'),
   toast: $('#toast'),
 };
@@ -47,11 +39,18 @@ const player = new StoryPlayer({
 });
 
 let lastItems = [];
+let busy = false;
 
 function setStatus(text, tone = '') {
   els.status.textContent = text;
   els.status.dataset.tone = tone;
   els.status.hidden = !text;
+}
+
+function setBusy(on) {
+  busy = on;
+  els.submitBtn.disabled = on;
+  els.submitBtn.textContent = on ? 'Loading…' : 'View story';
 }
 
 function toast(msg, ms = 2800) {
@@ -92,13 +91,29 @@ function setPlatformBadge(platform, kind) {
     [PLATFORMS.INSTAGRAM]: { label: 'Instagram', cls: 'badge-ig' },
     [PLATFORMS.FACEBOOK]: { label: 'Facebook', cls: 'badge-fb' },
   };
-  const info = map[platform] || { label: 'Unknown', cls: '' };
+  const info = map[platform] || { label: 'Media', cls: '' };
   els.platformBadge.textContent = kind ? `${info.label} · ${kind}` : info.label;
   els.platformBadge.className = `platform-badge ${info.cls}`;
   els.platformBadge.hidden = false;
 }
 
+function applyItems(items, meta = {}) {
+  lastItems = items;
+  showResult(true);
+  els.player.hidden = false;
+  if (meta.badge) {
+    els.platformBadge.hidden = false;
+    els.platformBadge.textContent = meta.badge;
+    els.platformBadge.className = `platform-badge ${meta.badgeCls || 'badge-manual'}`;
+  }
+  els.hint.innerHTML = meta.hint || `${items.length} segment(s)`;
+  player.setItems(items);
+  player.startKeyboard();
+  updateActionButtons();
+}
+
 async function runLookup(raw) {
+  if (busy) return;
   showError('');
   const parsed = parseUrl(raw);
 
@@ -114,33 +129,35 @@ async function runLookup(raw) {
   setPlatformBadge(parsed.platform, parsed.kind);
   showResult(true);
   els.player.hidden = true;
-  setStatus('Resolving…', 'busy');
+  setStatus('Loading story…', 'busy');
+  setBusy(true);
 
-  let outcome;
-  if (parsed.platform === PLATFORMS.INSTAGRAM) {
-    outcome = await resolveInstagram(parsed);
-  } else {
-    outcome = await resolveFacebook(parsed);
-  }
+  try {
+    let outcome;
+    if (parsed.platform === PLATFORMS.INSTAGRAM) {
+      outcome = await resolveInstagram(parsed);
+    } else {
+      outcome = await resolveFacebook(parsed);
+    }
 
-  if (!outcome.ok) {
+    if (!outcome.ok) {
+      setStatus('');
+      els.player.hidden = true;
+      showError(outcome.error || 'Unknown error', outcome.hint);
+      lastItems = [];
+      updateActionButtons();
+      return;
+    }
+
     setStatus('');
-    els.player.hidden = true;
-    showError(outcome.error || 'Unknown error', outcome.hint);
-    lastItems = [];
-    updateActionButtons();
-    return;
+    applyItems(outcome.items, {
+      hint: outcome.via
+        ? `${outcome.items.length} segment(s)`
+        : `${outcome.items.length} segment(s)`,
+    });
+  } finally {
+    setBusy(false);
   }
-
-  lastItems = outcome.items;
-  els.hint.innerHTML = outcome.via
-    ? `Resolved via <code>${escapeHtml(outcome.via)}</code> · ${outcome.items.length} segment(s)`
-    : `${outcome.items.length} segment(s)`;
-  setStatus('');
-  els.player.hidden = false;
-  player.setItems(lastItems);
-  player.startKeyboard();
-  updateActionButtons();
 }
 
 function escapeHtml(s) {
@@ -151,7 +168,6 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-/* events */
 els.form.addEventListener('submit', (e) => {
   e.preventDefault();
   runLookup(els.input.value);
@@ -170,11 +186,11 @@ els.pasteBtn.addEventListener('click', async () => {
     if (text) {
       els.input.value = text.trim();
       els.input.focus();
-      toast('Pasted from clipboard');
+      toast('Pasted');
     }
   } catch {
     els.input.focus();
-    toast('Clipboard blocked — paste manually (Ctrl+V)');
+    toast('Clipboard blocked — paste manually');
   }
 });
 
@@ -185,7 +201,7 @@ els.downloadBtn.addEventListener('click', async () => {
   const result = await downloadMedia(item);
   setStatus('');
   if (result === 'saved') toast('Download started');
-  else toast('Opened media tab — use browser Save if needed');
+  else toast('Opened media — use browser Save if needed');
 });
 
 els.openBtn.addEventListener('click', () => {
@@ -198,13 +214,14 @@ els.manualToggle.addEventListener('click', () => {
   const open = els.manualPanel.hidden;
   els.manualPanel.hidden = !open;
   els.manualToggle.setAttribute('aria-expanded', String(open));
+  els.manualToggle.textContent = open ? 'Hide paste box' : 'Open paste box';
   if (open) els.manualText.focus();
 });
 
 els.manualSubmit.addEventListener('click', () => {
   const text = els.manualText.value;
   if (!text.trim()) {
-    showError('Paste JSON or page source first.', 'Open the story/media URL in a new tab, copy the response or page source, paste here.');
+    showError('Paste JSON or page source first.', 'Open the story/media URL in a new tab, copy the response or page source.');
     return;
   }
   showError('');
@@ -213,53 +230,11 @@ els.manualSubmit.addEventListener('click', () => {
     showError(message || 'Nothing found.', 'Look for URLs containing cdninstagram.com, fbcdn.net, or scontent.');
     return;
   }
-  lastItems = items;
-  showResult(true);
-  els.player.hidden = false;
-  els.platformBadge.hidden = false;
-  els.platformBadge.textContent = 'Manual paste';
-  els.platformBadge.className = 'platform-badge badge-manual';
-  els.hint.textContent = `${items.length} segment(s) from pasted payload`;
-  player.setItems(items);
-  player.startKeyboard();
-  updateActionButtons();
+  applyItems(items, { badge: 'Pasted media', badgeCls: 'badge-manual' });
   setStatus('');
+  document.getElementById('result')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
-els.settingsToggle.addEventListener('click', () => {
-  const open = els.settingsPanel.hidden;
-  els.settingsPanel.hidden = !open;
-  els.settingsToggle.setAttribute('aria-expanded', String(open));
-  if (open) {
-    const s = loadSettings();
-    els.relayInput.value = s.relay;
-    els.useRelay.checked = s.useRelay;
-    els.useProxies.checked = s.useProxies;
-    renderRoutes();
-  }
-});
-
-els.settingsSave.addEventListener('click', () => {
-  saveSettings({
-    relay: els.relayInput.value.trim(),
-    useRelay: els.useRelay.checked,
-    useProxies: els.useProxies.checked,
-  });
-  renderRoutes();
-  toast('Settings saved in this browser');
-});
-
-function renderRoutes() {
-  const rows = listRoutesSummary();
-  els.routesList.innerHTML = rows
-    .map(
-      (r) =>
-        `<li><span class="route-label">${escapeHtml(r.label)}</span><code>${escapeHtml(r.url.slice(0, 80))}${r.url.length > 80 ? '…' : ''}</code></li>`
-    )
-    .join('');
-}
-
-/* demo data — lets you verify player UI without hitting Meta */
 const DEMO_ITEMS = [
   {
     type: 'image',
@@ -288,17 +263,19 @@ const DEMO_ITEMS = [
 ];
 
 els.demoBtn.addEventListener('click', () => {
-  lastItems = DEMO_ITEMS;
-  showResult(true);
   showError('');
-  els.player.hidden = false;
-  els.platformBadge.hidden = false;
-  els.platformBadge.textContent = 'Demo · not live';
-  els.platformBadge.className = 'platform-badge badge-manual';
-  els.hint.textContent = 'Local demo segments (UI preview only)';
-  player.setItems(DEMO_ITEMS);
-  player.startKeyboard();
-  updateActionButtons();
+  applyItems(DEMO_ITEMS, { badge: 'Demo', badgeCls: 'badge-manual', hint: 'Preview only — not live media' });
 });
 
 updateActionButtons();
+
+// Prefill from ?url=
+try {
+  const q = new URLSearchParams(location.search).get('url');
+  if (q) {
+    els.input.value = q;
+    runLookup(q);
+  }
+} catch {
+  /* ignore */
+}

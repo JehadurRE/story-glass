@@ -107,6 +107,62 @@ code {
   flex-wrap: wrap;
 }
 
+.header-nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.header-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.header-nav a:hover {
+  color: var(--frost);
+}
+
+.manual-panel {
+  margin-top: 0.9rem;
+}
+
+.manual-panel[hidden] {
+  display: none !important;
+}
+
+.manual-panel textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--frost);
+  background: var(--void);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  outline: none;
+}
+
+.manual-panel textarea:focus {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 3px rgba(108, 140, 255, 0.15);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
 /* —— layout —— */
 main {
   max-width: var(--max);

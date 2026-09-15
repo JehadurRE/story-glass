@@ -6,7 +6,7 @@
     <title>StoryGlass — Facebook &amp; Instagram Story Viewer</title>
     <meta
       name="description"
-      content="View public Facebook and Instagram stories in your browser. No account, no app. Client-first tool with optional personal CORS relay."
+      content="View public Facebook and Instagram stories in your browser. No account, no app. Paste a link and watch."
     />
     <meta name="color-scheme" content="dark" />
     <link rel="stylesheet" href="./css/styles.css" />
@@ -18,37 +18,31 @@
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "Any",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-        "description": "Client-first Facebook and Instagram story viewer. Paste a public story link and watch media in the browser without creating an account."
+        "description": "Facebook and Instagram story viewer. Paste a public story link and watch media in the browser without creating an account."
       }
     </script>
   </head>
   <body>
     <header class="site-header">
       <div class="site-header-inner">
-        <div class="wordmark" aria-label="StoryGlass">
+        <a class="wordmark" href="./" aria-label="StoryGlass home">
           <span class="wordmark-mark" aria-hidden="true"></span>
           StoryGlass
-        </div>
-        <div class="header-actions">
-          <button type="button" class="btn btn-ghost btn-sm" id="manual-toggle" aria-expanded="false">
-            Manual paste
-          </button>
-          <button type="button" class="btn btn-ghost btn-sm" id="settings-toggle" aria-expanded="false">
-            Relay settings
-          </button>
-        </div>
+        </a>
+        <nav class="header-nav" aria-label="Page">
+          <a href="#how">How it works</a>
+          <a href="#faq">FAQ</a>
+        </nav>
       </div>
     </header>
 
     <main>
       <section class="hero">
-        <p class="eyebrow">Facebook · Instagram · no visitor account</p>
-        <h1>Watch public stories without logging in here</h1>
+        <p class="eyebrow">Facebook · Instagram · no sign-up</p>
+        <h1>View public stories in your browser</h1>
         <p class="lede">
-          Paste a story link. StoryGlass resolves media and plays it in your browser. No StoryGlass
-          account. Optional personal relay for Facebook. Instagram stories need a server session —
-          that session <strong>can appear as a viewer</strong> on the creator’s story; this is not
-          an anonymity tool.
+          Copy a story or video link, paste it here, and watch. Works on phone and desktop.
+          No StoryGlass account. No app install.
         </p>
       </section>
 
@@ -63,12 +57,12 @@
               inputmode="url"
               spellcheck="false"
               placeholder="https://www.instagram.com/stories/username/123…"
-              aria-label="Story URL"
+              aria-label="Story or video URL"
             />
           </div>
           <button type="button" class="btn" id="clear-input" title="Clear">Clear</button>
           <button type="button" class="btn" id="paste-clip" title="Paste">Paste</button>
-          <button type="submit" class="btn btn-primary">View story</button>
+          <button type="submit" class="btn btn-primary" id="submit-btn">View story</button>
         </div>
         <p class="status" id="status" hidden></p>
       </form>
@@ -86,155 +80,97 @@
           <div class="player-meta" id="player-meta"></div>
           <div class="player-media" id="player-media"></div>
           <div class="player-actions">
-            <button type="button" class="btn btn-primary" id="download-current" disabled>Save current</button>
-            <button type="button" class="btn" id="open-current" disabled>Open media</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="demo-load">
-              Load demo
-            </button>
+            <button type="button" class="btn btn-primary" id="download-current" disabled>Save</button>
+            <button type="button" class="btn" id="open-current" disabled>Open</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="demo-load">Demo</button>
           </div>
         </div>
       </section>
 
-      <section class="panel" id="manual-panel" hidden>
-        <h2>Manual paste (works when proxies fail)</h2>
-        <p>
-          Open the media URL or story page in a new tab, copy the JSON response or page source, paste it
-          here. Your browser already did the network work — we only parse.
-        </p>
-        <label class="sr-only" for="manual-text">JSON or HTML</label>
-        <textarea id="manual-text" placeholder='{"items":[…]}  or  &lt;html&gt;…scontent…&lt;/html&gt;'></textarea>
-        <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap">
-          <button type="button" class="btn btn-primary" id="manual-submit">Parse pasted data</button>
-        </div>
-      </section>
-
-      <section class="panel" id="settings-panel" hidden>
-        <h2>Relay settings</h2>
-        <p>
-          Browsers block direct calls to Instagram/Facebook (CORS). Point this at StoryGlass relay —
-          local <code>node scripts/local-relay.mjs</code> or a deployed Cloudflare Worker.
-          <strong>Facebook</strong> public videos resolve without any login.
-          <strong>Instagram stories</strong> need Worker secret <code>IG_SESSIONID</code>. That is a
-          real logged-in Instagram session on your server: Meta may list that account as a
-          <em>viewer</em> of the story. It does not hide the end user behind true anonymity.
-          Settings stay in this browser only.
-        </p>
-        <div class="settings-grid">
-          <label>
-            Relay base URL
-            <input
-              id="relay-input"
-              type="url"
-              placeholder="http://127.0.0.1:8787  or  https://your-worker.workers.dev"
-              style="
-                width: 100%;
-                margin-top: 0.35rem;
-                padding: 0.7rem 0.75rem;
-                border-radius: 6px;
-                border: 1px solid var(--line);
-                background: var(--void);
-                color: var(--frost);
-                font-family: var(--mono);
-                font-size: 0.88rem;
-              "
-            />
-          </label>
-          <label class="check"><input type="checkbox" id="use-relay" checked /> Prefer my relay</label>
-          <label class="check"><input type="checkbox" id="use-proxies" checked /> Use public CORS proxies</label>
-          <button type="button" class="btn btn-primary" id="settings-save" style="justify-self: start">
-            Save settings
-          </button>
-        </div>
-        <ul class="routes-list" id="routes-list"></ul>
-      </section>
-
       <div class="sections">
         <article class="section-card" id="how">
-          <h2>How to view a story</h2>
+          <h2>How to use</h2>
           <div class="steps">
             <div class="step">
               <span class="step-num">01</span>
               <div>
-                <strong>Copy a specific story link</strong>
-                In Instagram or Facebook, open the story → Share → Copy link. Prefer URLs that include a
-                numeric id (<code>/stories/user/123…</code>).
+                <strong>Copy the link</strong>
+                In Instagram or Facebook, open the story or video → Share → Copy link.
               </div>
             </div>
             <div class="step">
               <span class="step-num">02</span>
               <div>
-                <strong>Paste into StoryGlass</strong>
-                Hit <em>View story</em>. We try your relay, then public proxies. No sign-up.
+                <strong>Paste and view</strong>
+                Drop it in the box above and hit <em>View story</em>.
               </div>
             </div>
             <div class="step">
               <span class="step-num">03</span>
               <div>
-                <strong>Watch the rail</strong>
-                Segments play like in-app stories. Use ← / → to step. Save only content you own or have
-                permission to keep.
+                <strong>Watch or save</strong>
+                Use the rail to step through segments. Save only content you own or may keep.
               </div>
             </div>
           </div>
-          <h3>If auto-resolve fails</h3>
-          <ul>
-            <li>Story may be private, expired (~24h), or removed.</li>
-            <li>Username-only links need Instagram’s private story API — use a single-story link instead.</li>
-            <li>Use <em>Manual paste</em> with page source or JSON from a new tab.</li>
-          </ul>
         </article>
 
         <article class="section-card" id="privacy">
-          <h2>What “client-side” and “anonymous” mean here</h2>
+          <h2>What you should know</h2>
           <p>
-            All UI, URL parsing, players, and downloads run in your browser. StoryGlass has no visitor
-            accounts and does not host media. Because Meta blocks cross-origin reads, the page may call a
-            CORS relay you choose.
+            You do not need a StoryGlass account. We do not store your media on our servers for
+            playback — files stream from the platform CDNs when available.
           </p>
           <p>
-            <strong>Not anonymous toward Instagram.</strong> If you enable <code>IG_SESSIONID</code>,
-            your Worker uses a logged-in account to read stories. Instagram can (and often does) show
-            that account in the creator’s story viewer list. Loading the CDN file after you already have
-            the URL does not by itself register a new view — but getting the URL via that session is what
-            risks the view. Facebook public video HTML extract does not need a login and is a different path.
-          </p>
-          <p>
-            Private accounts stay private. This tool does not bypass login walls or audience restrictions.
+            Private or expired stories usually cannot be loaded. This is not a way around login walls
+            or audience limits. Instagram may still count views toward the creator depending on how
+            the content is fetched.
           </p>
         </article>
 
         <article class="section-card" id="faq">
           <h2>FAQ</h2>
-          <h3>Is this an anonymous Instagram story viewer?</h3>
+          <h3>Do I need to sign up?</h3>
+          <p>No. Paste a public link and watch.</p>
+          <h3>Which links work best?</h3>
           <p>
-            No. “No account” means you do not sign up for StoryGlass. If Instagram stories are resolved
-            via <code>IG_SESSIONID</code>, that logged-in server account may show up in the creator’s
-            viewer list. We do not offer stealth viewing.
+            Facebook public videos (<code>/watch/?v=</code>, <code>/videos/</code>) and Instagram
+            story links that include a media id. Profile-only links are harder.
           </p>
-          <h3>Do I need an Instagram or Facebook account to use this?</h3>
-          <p>No account on StoryGlass. Facebook public videos work without any Meta login. Instagram stories require your Worker’s optional session.</p>
-          <h3>Why not “pure” static fetch to Instagram?</h3>
+          <h3>Why did it fail?</h3>
           <p>
-            CORS. The browser will not let this origin read Instagram/Facebook responses. A relay or manual
-            paste is required for real data.
+            The story may be private, deleted, or past ~24 hours. Copy the full link again (not just
+            a username). You can also open <em>Having trouble?</em> and paste page source.
           </p>
-          <h3>Does it work on phone?</h3>
-          <p>Yes — modern mobile browsers are first-class. Copy link from the app, paste here.</p>
-          <h3>Can I download in full HD?</h3>
+          <h3>Does it work on iPhone / Android?</h3>
+          <p>Yes — any modern mobile browser.</p>
+        </article>
+
+        <article class="section-card" id="trouble">
+          <h2>Having trouble?</h2>
           <p>
-            You get whatever resolution the public CDN returns. We do not upscale or invent quality.
+            If auto-load fails, open the media or story page in another tab, copy the page source or
+            JSON, and paste it below. We only parse — we do not need your login.
           </p>
+          <button type="button" class="btn btn-sm" id="manual-toggle" aria-expanded="false">
+            Open paste box
+          </button>
+          <div class="manual-panel" id="manual-panel" hidden>
+            <label class="sr-only" for="manual-text">JSON or HTML</label>
+            <textarea id="manual-text" placeholder='Paste page source or JSON with media URLs'></textarea>
+            <div style="margin-top: 0.75rem">
+              <button type="button" class="btn btn-primary" id="manual-submit">Load pasted media</button>
+            </div>
+          </div>
         </article>
       </div>
     </main>
 
     <footer>
       <p>
-        <strong>StoryGlass</strong> — educational / personal use. Instagram session mode is
-        <em>not</em> a stealth viewer: the session account may appear in the creator’s viewer list.
-        Respect creators’ rights and Meta’s terms. Do not redistribute content you do not own.
+        <strong>StoryGlass</strong> — personal / educational use. Respect creators and platform terms.
       </p>
-      <p>Static app · optional Cloudflare Worker relay · no accounts</p>
+      <p>Static app + built-in resolve API · no visitor accounts</p>
     </footer>
 
     <div class="toast" id="toast" hidden role="status"></div>

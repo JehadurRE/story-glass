@@ -40,10 +40,10 @@ export async function resolveInstagram(parsed) {
       error:
         viaRelay.error && viaRelay.error !== 'No relay configured'
           ? viaRelay.error
-          : `Username-only story links need Instagram's private story API.`,
+          : 'We need a direct story link, not only a username.',
       hint:
         viaRelay.hint ||
-        `Deploy StoryGlass Worker with IG_SESSIONID secret, or paste a specific story link (…/stories/${username}/123…).`,
+        `Open one story → Share → Copy link (should end with numbers), or use “Having trouble?” below.`,
     };
   }
 
@@ -54,10 +54,10 @@ export async function resolveInstagram(parsed) {
       error:
         viaRelay.error && viaRelay.error !== 'No relay configured'
           ? viaRelay.error
-          : 'Profile links need a server-side Instagram session to list live stories.',
+          : 'Profile links do not list live stories from the browser alone.',
       hint:
         viaRelay.hint ||
-        'Set Worker secret IG_SESSIONID (throwaway account), then retry. Or open a single story → Copy link.',
+        'Copy a single story link (Share → Copy link) and paste that, or try a Facebook video link.',
     };
   }
 

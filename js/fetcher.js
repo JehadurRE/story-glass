@@ -179,21 +179,20 @@ export function loadSettings() {
 }
 
 /**
- * Ask the configured relay (or same-origin /api/resolve on Vercel) to resolve.
- * @returns {Promise<{ok: boolean, items?: any[], error?: string, hint?: string, source?: string, via: string}>}
+ * Resolve via the app's own API (same origin). Optional extra base URL via
+ * localStorage key sg.relay is only for local/dev — never shown in the product UI.
  */
 export async function resolveViaRelay(targetUrl) {
-  const relay = getRelayBase();
   const endpoints = [];
 
-  // Same-origin first when deployed (Vercel api/resolve.js)
   if (typeof location !== 'undefined' && location.origin && location.protocol.startsWith('http')) {
     endpoints.push({
-      id: 'origin',
+      id: 'app',
       url: `${location.origin}/api/resolve?url=${encodeURIComponent(targetUrl)}`,
     });
   }
 
+  const relay = getRelayBase();
   if (relay && getRelayPref()) {
     const base = relay.replace(/\/$/, '');
     endpoints.push({
@@ -203,18 +202,17 @@ export async function resolveViaRelay(targetUrl) {
   }
 
   if (!endpoints.length) {
-    return { ok: false, via: 'none', error: 'No relay configured' };
+    return { ok: false, via: 'none', error: 'Resolver unavailable' };
   }
 
-  let lastError = 'No relay configured';
+  let lastError = 'Could not resolve this link.';
   let lastHint = '';
 
   for (const endpoint of endpoints) {
     try {
       const res = await fetchWithTimeout(endpoint.url, { headers: { Accept: 'application/json' } }, 20000);
-      // same-origin 404 means this host has no API — try next
       if (res.status === 404) {
-        lastError = 'Relay not found';
+        lastError = 'Resolver not available on this host.';
         continue;
       }
       const text = await res.text();
@@ -222,8 +220,7 @@ export async function resolveViaRelay(targetUrl) {
       try {
         json = JSON.parse(text);
       } catch {
-        lastError = `Relay returned non-JSON (HTTP ${res.status})`;
-        lastHint = 'Check Worker/Vercel function deploy.';
+        lastError = `Server error (HTTP ${res.status})`;
         continue;
       }
       if (json && json.ok && Array.isArray(json.items) && json.items.length) {
@@ -234,13 +231,12 @@ export async function resolveViaRelay(targetUrl) {
           source: json.source || endpoint.id,
         };
       }
-      lastError = (json && json.error) || `Relay could not resolve (HTTP ${res.status})`;
-      lastHint = (json && json.hint) || 'Try Manual paste or a Facebook public video link.';
+      lastError = (json && json.error) || 'Could not load media for this link.';
+      lastHint = (json && json.hint) || 'Try a Facebook public video link, or paste page source under “Having trouble?”.';
     } catch (e) {
-      const msg = e && e.name === 'AbortError' ? 'Relay timeout' : (e && e.message) || 'Relay unreachable';
+      const msg = e && e.name === 'AbortError' ? 'Request timed out' : (e && e.message) || 'Network error';
       lastError = msg;
-      lastHint =
-        'Start scripts/local-relay.mjs, deploy worker/cors-relay.js, or use the Vercel /api/resolve function.';
+      lastHint = 'Check your connection and try again.';
     }
   }
 
