@@ -325,96 +325,247 @@ function extractFromIgJson(json) {
     const videos = media.video_versions || [];
     if (videos.length) {
       const best = videos.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a), videos[0]);
-      items.push({ type: 'video', url: best.url, width: best.width, height: best.height, username: user, caption, takenAt, id, source: 'instagram' });
+      items.push({
+        type: 'video',
+        url: best.url,
+        width: best.width,
+        height: best.height,
+        username: user,
+        caption,
+        takenAt,
+        id,
+        source: 'instagram',
+      });
       return;
     }
     const images = media.image_versions2?.candidates || [];
     if (images.length) {
       const best = images.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a), images[0]);
-      items.push({ type: 'image', url: best.url, width: best.width, height: best.height, username: user, caption, takenAt, id, source: 'instagram' });
+      items.push({
+        type: 'image',
+        url: best.url,
+        width: best.width,
+        height: best.height,
+        username: user,
+        caption,
+        takenAt,
+        id,
+        source: 'instagram',
+      });
     }
   };
   if (Array.isArray(json.items)) json.items.forEach((m) => pushMedia(m));
   else if (json.item) pushMedia(json.item);
+  else if (json.media) pushMedia(json.media);
   if (json.reels) for (const reel of Object.values(json.reels)) (reel.items || []).forEach((i) => pushMedia(i));
   if (json.tray) for (const reel of json.tray) (reel.items || []).forEach((i) => pushMedia(i));
+  if (json.story?.items) json.story.items.forEach((i) => pushMedia(i));
+  if (json.highlights) for (const h of Object.values(json.highlights)) (h.items || []).forEach((i) => pushMedia(i));
   return items;
 }
 
-async function igUserIdFromProfile(username, headers = {}) {
-  const res = await fetchText(`https://www.instagram.com/${username}/`, {
+/** Cookie header from IG_SESSIONID (sessionid=…) or a fuller cookie dump. */
+function igCookieHeader() {
+  const raw = (process.env.IG_SESSIONID || process.env.IG_COOKIE || '').trim();
+  if (!raw) return '';
+  if (raw.includes('=') && raw.includes('sessionid')) return raw;
+  if (raw.includes(';')) return raw;
+  return `sessionid=${raw}`;
+}
+
+async function igUserIdFromProfile(username, cookie) {
+  // 1) HTML with session — we saw user_id in profile HTML when logged-in
+  const page = await fetchText(`https://www.instagram.com/${username}/`, {
+    'User-Agent': BROWSER_UA,
+    Accept: 'text/html',
     'X-IG-App-ID': '936619743392459',
-    ...headers,
+    Cookie: cookie,
+    Referer: 'https://www.instagram.com/',
   });
-  const html = res.text;
+  const html = page.text;
   for (const re of [
     /"user_id"\s*:\s*"?(\d{5,})"?/,
     /profilePage_(\d+)/,
+    /"id"\s*:\s*"(\d{5,})"\s*,\s*"username"/,
     /"pk"\s*:\s*"?(\d{5,})"?/,
   ]) {
     const m = html.match(re);
     if (m && m[1] && m[1].length >= 5) return m[1];
   }
+
+  // 2) web_profile_info (needs real session)
+  const info = await fetchText(
+    `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`,
+    {
+      'User-Agent': BROWSER_UA,
+      Accept: '*/*',
+      'X-IG-App-ID': '936619743392459',
+      'X-Requested-With': 'XMLHttpRequest',
+      Cookie: cookie,
+      Referer: `https://www.instagram.com/${username}/`,
+      'Sec-Fetch-Site': 'same-origin',
+      'Sec-Fetch-Mode': 'cors',
+      'Sec-Fetch-Dest': 'empty',
+    }
+  );
+  if (info.text.trim().startsWith('{')) {
+    try {
+      const j = JSON.parse(info.text);
+      return j.data?.user?.id || j.user?.id || null;
+    } catch {
+      /* ignore */
+    }
+  }
   return null;
 }
 
-async function resolveInstagram(parsed, originalUrl) {
-  const sessionId = process.env.IG_SESSIONID || '';
-  // GET only — never POST /api/v1/media/seen/ (that is the explicit mark-viewed call).
-  if (sessionId && parsed.username) {
+async function fetchIgStoryFeed(userId, cookie) {
+  const endpoints = [
+    {
+      url: `https://i.instagram.com/api/v1/feed/user/${userId}/story/`,
+      headers: { 'User-Agent': ANDROID_UA, 'X-IG-App-ID': '936619743392459', Accept: 'application/json', Cookie: cookie },
+    },
+    {
+      url: `https://www.instagram.com/api/v1/feed/user/${userId}/story/`,
+      headers: {
+        'User-Agent': BROWSER_UA,
+        Accept: 'application/json',
+        'X-IG-App-ID': '936619743392459',
+        'X-Requested-With': 'XMLHttpRequest',
+        Cookie: cookie,
+        Referer: 'https://www.instagram.com/',
+      },
+    },
+  ];
+
+  for (const ep of endpoints) {
+    // GET only — never POST /api/v1/media/seen/
+    const res = await fetchText(ep.url, ep.headers);
+    const trimmed = res.text.trim();
+    if (!trimmed.startsWith('{')) continue;
+    let json;
     try {
-      const cookie = `sessionid=${sessionId}`;
-      const userId = await igUserIdFromProfile(parsed.username, { Cookie: cookie });
-      if (userId) {
-        const story = await fetchText(`https://i.instagram.com/api/v1/feed/user/${userId}/story/`, {
+      json = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    if (json.message && /login_required|challenge|wait a few minutes/i.test(String(json.message))) {
+      return { items: [], error: json.message, loginWall: true };
+    }
+    if (json.status === 'fail' && json.message) {
+      return { items: [], error: json.message, loginWall: /login/i.test(json.message) };
+    }
+    const items = extractFromIgJson(json);
+    if (items.length) return { items, error: null };
+  }
+  return { items: [], error: 'Story feed returned no items (no live stories or session blocked).', loginWall: false };
+}
+
+async function resolveInstagram(parsed, originalUrl) {
+  const cookie = igCookieHeader();
+  const notes = [];
+
+  // --- session path (same capability class as BraveDown) ---
+  if (cookie) {
+    try {
+      // specific media id
+      if (parsed.mediaId) {
+        const info = await fetchText(`https://i.instagram.com/api/v1/media/${parsed.mediaId}/info/`, {
           'User-Agent': ANDROID_UA,
           'X-IG-App-ID': '936619743392459',
           Accept: 'application/json',
           Cookie: cookie,
         });
-        if (story.text.trim().startsWith('{')) {
-          const json = JSON.parse(story.text);
-          const items = extractFromIgJson(json).map((i) => ({
-            ...i,
-            username: i.username || parsed.username,
-            source: 'ig-story-api',
-          }));
+        if (info.text.trim().startsWith('{')) {
+          const items = extractFromIgJson(JSON.parse(info.text));
           if (items.length) {
-            return { ok: true, platform: 'instagram', items, source: 'ig-story-api', userId, seenMark: false };
+            return {
+              ok: true,
+              platform: 'instagram',
+              kind: parsed.kind,
+              items,
+              source: 'ig-media-info',
+              seenMark: false,
+            };
           }
         }
+        notes.push('media info: no items');
       }
-    } catch {
-      /* fall through */
+
+      const username = parsed.username;
+      if (username) {
+        const userId = await igUserIdFromProfile(username, cookie);
+        if (userId) {
+          const feed = await fetchIgStoryFeed(userId, cookie);
+          if (feed.items.length) {
+            return {
+              ok: true,
+              platform: 'instagram',
+              kind: 'story',
+              items: feed.items.map((i) => ({
+                ...i,
+                username: i.username || username,
+                source: 'ig-story-api',
+              })),
+              source: 'ig-story-api',
+              userId,
+              seenMark: false,
+            };
+          }
+          notes.push(`story feed: ${feed.error || 'empty'}`);
+        } else {
+          notes.push('could not resolve user id from profile');
+        }
+      }
+    } catch (e) {
+      notes.push(`session path: ${e && e.message ? e.message : e}`);
     }
   }
-  if (sessionId && parsed.mediaId) {
-    try {
-      const info = await fetchText(`https://i.instagram.com/api/v1/media/${parsed.mediaId}/info/`, {
-        'User-Agent': ANDROID_UA,
-        'X-IG-App-ID': '936619743392459',
-        Accept: 'application/json',
-        Cookie: `sessionid=${sessionId}`,
-      });
-      if (info.text.trim().startsWith('{')) {
-        const items = extractFromIgJson(JSON.parse(info.text));
-        if (items.length) return { ok: true, platform: 'instagram', items, source: 'ig-media-info', seenMark: false };
+
+  // --- logged-out fallbacks (usually login wall in 2026) ---
+  if (parsed.mediaId) {
+    const info = await fetchText(`https://i.instagram.com/api/v1/media/${parsed.mediaId}/info/`, {
+      'User-Agent': ANDROID_UA,
+      'X-IG-App-ID': '936619743392459',
+      Accept: 'application/json',
+    });
+    if (info.text.trim().startsWith('{')) {
+      const items = extractFromIgJson(JSON.parse(info.text));
+      if (items.length) {
+        return { ok: true, platform: 'instagram', items, source: 'ig-json-public', seenMark: false };
       }
-    } catch {
-      /* ignore */
+    }
+    notes.push('public media info: login wall or empty');
+  }
+
+  if (parsed.shortcode) {
+    for (const u of [
+      `https://www.instagram.com/p/${parsed.shortcode}/embed/captioned/`,
+      `https://www.instagram.com/reel/${parsed.shortcode}/embed/`,
+      `https://www.instagram.com/p/${parsed.shortcode}/`,
+    ]) {
+      const res = await fetchText(u, { 'User-Agent': BROWSER_UA, Accept: 'text/html' });
+      const items = extractMediaUrls(res.text).filter(
+        (i) => !/rsrc\.php|static\.cdninstagram\.com$/i.test(i.url)
+      );
+      if (items.length) {
+        return { ok: true, platform: 'instagram', items, source: 'ig-html', seenMark: false };
+      }
+      notes.push(`${u}: no media`);
     }
   }
 
   return {
     ok: false,
     platform: 'instagram',
-    error: sessionId
-      ? 'Instagram session returned no media (expired session or no live stories).'
-      : 'Instagram requires a server session for stories (login wall).',
-    hint: sessionId
-      ? 'Rotate IG_SESSIONID in Vercel env.'
-      : 'Set Vercel env IG_SESSIONID for stories, or use Facebook links / Manual paste. Note: session is not a stealth viewer.',
+    error: cookie
+      ? 'Instagram session did not return media (expired, challenged, or no live stories).'
+      : 'Instagram login wall — story APIs need a server session in 2026.',
+    hint: cookie
+      ? 'Open Vercel → Project → Settings → Environment Variables → update IG_SESSIONID from a fresh throwaway account cookie, then redeploy.'
+      : 'Set Vercel env IG_SESSIONID (cookie sessionid from a throwaway IG account). Facebook public videos work without it. Session may appear as a story viewer.',
     seenMark: false,
+    details: notes,
   };
 }
 

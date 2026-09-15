@@ -29,8 +29,11 @@ Optional Instagram stories (server session — may appear as a viewer on the cre
 
 ```powershell
 npx vercel env add IG_SESSIONID production
+# paste sessionid cookie from a throwaway IG account
 npx vercel --prod --yes
 ```
+
+Full write-up: [docs/INSTAGRAM.md](./docs/INSTAGRAM.md) — why logged-out IG is a wall, and how the session path works (same class as BraveDown).
 
 ## Local dev
 
