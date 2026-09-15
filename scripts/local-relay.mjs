@@ -190,6 +190,28 @@ function parseStoryBucket(html) {
   return { pageId, storyFbid };
 }
 
+function extractStoryPreviews(html) {
+  const items = [];
+  const seen = new Set();
+  const scripts = [...String(html).matchAll(/<script[^>]*type="application\/json"[^>]*>([\s\S]*?)<\/script>/gi)];
+  for (const s of scripts) {
+    const body = s[1];
+    if (!body.includes('story_bucket') && !body.includes('first_story_to_show')) continue;
+    const n = normalizeHtml(body);
+    const urls = n.match(/https?:\/\/[^\s"'<>\\]+?\.(?:jpg|jpeg|webp|png)(?:\?[^\s"'<>\\]*)?/gi) || [];
+    for (const raw of urls) {
+      const u = raw.replace(/[),.;\]}]+$/, '');
+      if (!/fbcdn|scontent/i.test(u)) continue;
+      if (/profile_pic|safe_image|emoji|rsrc\.php/i.test(u)) continue;
+      const key = u.split('?')[0];
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push({ type: 'image', url: u, source: 'story-preview' });
+    }
+  }
+  return items.slice(0, 8);
+}
+
 async function resolveFacebook(parsed, originalUrl, opts = {}) {
   const includeLibrary = Boolean(opts.includeLibrary);
   const candidates = [];
@@ -209,8 +231,10 @@ async function resolveFacebook(parsed, originalUrl, opts = {}) {
     } else {
       // detect live story_bucket on profile, then try story viewer
       let live = null;
+      let homeHtml = '';
       try {
         const home = await fetchText(`https://www.facebook.com/${h}`);
+        homeHtml = home.text;
         const title = (home.text.match(/property="og:title"\s+content="([^"]+)"/) || [])[1];
         pageMeta = { title: title?.replace(/&amp;/g, '&') || '', handle: h };
         live = parseStoryBucket(home.text);
@@ -226,7 +250,26 @@ async function resolveFacebook(parsed, originalUrl, opts = {}) {
         candidates.push(`https://www.facebook.com/stories/${live.pageId}`);
       }
       candidates.push(`https://www.facebook.com/stories/${h}`);
-      if (live) hasLiveStory = true;
+      if (live) {
+        hasLiveStory = true;
+        const previews = extractStoryPreviews(homeHtml);
+        if (previews.length) {
+          return {
+            ok: true,
+            platform: 'facebook',
+            items: previews.map((i) => ({
+              ...i,
+              username: h,
+              authorName: pageMeta?.title || '',
+              platform: 'Facebook',
+            })),
+            source: 'story-preview',
+            page: pageMeta,
+            hasLiveStory: true,
+            hint: 'Current story preview still (first-party).',
+          };
+        }
+      }
     }
   }
   if (!candidates.length) candidates.push(originalUrl);

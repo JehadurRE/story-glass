@@ -232,7 +232,6 @@ function parseStoryBucket(html) {
   if (firstRaw) {
     try {
       const decoded = atob(firstRaw);
-      // e.g. S:_ISC:1391279903214514
       const m = decoded.match(/(\d{8,})/);
       if (m) storyFbid = m[1];
     } catch {
@@ -241,6 +240,41 @@ function parseStoryBucket(html) {
   }
   if (!pageId && !storyFbid) return null;
   return { pageId, storyFbid };
+}
+
+/**
+ * First-party story preview stills from profile JSON scripts that contain story_bucket.
+ * Facebook prefetches these for the live story ring — logged-out HTML, CORS on CDN.
+ */
+function extractStoryPreviews(html) {
+  const items = [];
+  const seen = new Set();
+  const scripts = [...String(html).matchAll(/<script[^>]*type="application\/json"[^>]*>([\s\S]*?)<\/script>/gi)];
+  for (const s of scripts) {
+    const body = s[1];
+    if (!body.includes('story_bucket') && !body.includes('first_story_to_show')) continue;
+    const n = normalizeHtml(body);
+    const urls = n.match(/https?:\/\/[^\s"'<>\\]+?\.(?:jpg|jpeg|webp|png)(?:\?[^\s"'<>\\]*)?/gi) || [];
+    for (const raw of urls) {
+      const u = raw.replace(/[),.;\]}]+$/, '');
+      if (!/fbcdn|scontent/i.test(u)) continue;
+      if (/profile_pic|safe_image|emoji|rsrc\.php/i.test(u)) continue;
+      // prefer full-size story stills over tiny avatars
+      if (/s100x100|s148x148|s200x200|s320x320/i.test(u) && !/s960x960|s2048|mx2048/i.test(u)) continue;
+      const key = u.split('?')[0];
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push({
+        type: 'image',
+        url: u,
+        id: hashId(u),
+        source: 'story-preview',
+      });
+    }
+  }
+  // largest-looking first
+  items.sort((a, b) => (b.url.includes('s960') || b.url.includes('mx2048') ? 1 : 0) - (a.url.includes('s960') || a.url.includes('mx2048') ? 1 : 0));
+  return items.slice(0, 8);
 }
 
 async function resolveFacebook(parsed, originalUrl, options = {}) {
@@ -273,8 +307,10 @@ async function resolveFacebook(parsed, originalUrl, options = {}) {
   if (handle && parsed.kind === 'profile' && !includeLibrary) {
     // 1) Profile HTML often embeds story_bucket when a live story exists
     let liveStory = null;
+    let homeHtml = '';
     try {
       const home = await fetchFacebook(`https://www.facebook.com/${handle}`);
+      homeHtml = home.text;
       pageMeta = pageMetaFromHtml(home.text);
       if (pageMeta.title) pageMeta = { ...pageMeta, handle };
       liveStory = parseStoryBucket(home.text);
@@ -320,6 +356,26 @@ async function resolveFacebook(parsed, originalUrl, options = {}) {
     }
 
     if (liveStory) {
+      // First-party preview stills next to story_bucket (logged-out HTML)
+      const previews = extractStoryPreviews(homeHtml);
+      if (previews.length) {
+        return {
+          ok: true,
+          platform: 'facebook',
+          kind: 'story',
+          items: previews.map((i) => ({
+            ...i,
+            username: handle,
+            authorName: pageMeta?.title || '',
+            platform: 'Facebook',
+          })),
+          source: 'story-preview',
+          page: pageMeta,
+          hasLiveStory: true,
+          hint: 'Current story preview still (first-party). Full video needs FB_COOKIE.',
+        };
+      }
+
       const hasFbSession = Boolean(fbCookieHeader());
       return {
         ok: false,
@@ -327,10 +383,10 @@ async function resolveFacebook(parsed, originalUrl, options = {}) {
         kind: 'story',
         error: hasFbSession
           ? `${pageMeta?.title || 'This page'} has a live story, but Facebook still blocked the story player (session expired or challenged).`
-          : `${pageMeta?.title || 'This page'} has a live story, but Facebook blocked the story player for logged-out requests.`,
+          : `${pageMeta?.title || 'This page'} has a live story, but full story media is login-walled.`,
         hint: hasFbSession
           ? 'Rotate FB_COOKIE in Vercel from a fresh throwaway Facebook login.'
-          : 'Set Vercel env FB_COOKIE (c_user + xs from a throwaway FB account) — same idea as BraveDown’s server session. Or paste a /watch/?v= link.',
+          : 'Set FB_COOKIE for story video, or paste a /watch/?v= link. Optional reels available.',
         page: pageMeta,
         optional: 'library',
         hasLiveStory: true,
