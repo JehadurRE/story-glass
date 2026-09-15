@@ -94,10 +94,10 @@ export async function resolveFacebook(parsed) {
 }
 
 function buildCandidateUrls(parsed) {
-  const { kind, mediaId, pageId, storyFbid, normalized, original } = parsed;
+  const { kind, mediaId, pageId, storyFbid, username, normalized, original } = parsed;
   const candidates = [];
 
-  if (kind === 'video' && mediaId) {
+  if ((kind === 'video' || kind === 'reel') && mediaId) {
     candidates.push(`https://www.facebook.com/watch/?v=${mediaId}`);
     if ((normalized || original || '').includes('/videos/')) candidates.push(normalized || original);
     candidates.push(`https://www.facebook.com/reel/${mediaId}`);
@@ -112,6 +112,11 @@ function buildCandidateUrls(parsed) {
     if (mediaId && !pageId) {
       candidates.push(`https://www.facebook.com/story.php?story_fbid=${encodeURIComponent(mediaId)}`);
     }
+  }
+  if (kind === 'profile' && username) {
+    candidates.push(`https://www.facebook.com/${username}/videos`);
+    candidates.push(`https://www.facebook.com/${username}/reels`);
+    candidates.push(`https://www.facebook.com/${username}`);
   }
   if (!candidates.length && (normalized || original)) candidates.push(normalized || original);
   return candidates;

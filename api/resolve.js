@@ -10,6 +10,22 @@
 
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+
+/** Full desktop headers — Facebook returns HTTP 400 without Sec-Fetch / ch-ua. */
+const FB_HEADERS = {
+  'User-Agent': BROWSER_UA,
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1',
+  'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+};
+
 const ANDROID_UA =
   'Instagram 192.0.0.35.78 Android (29/10; 420dpi; 1080x2129; samsung; SM-G973F; beyond1; exynos9820; en_US; 301484484)';
 
@@ -131,7 +147,11 @@ function parseTarget(raw) {
   }
   if (fb) {
     if (segs[0] === 'watch') return { platform: 'facebook', kind: 'video', mediaId: u.searchParams.get('v') };
-    if (segs[0] === 'reel' || segs.includes('videos')) {
+    // /page/videos/123456 or /reel/123456 — not /page/videos (tab)
+    if (segs[0] === 'reel' && segs[1]) {
+      return { platform: 'facebook', kind: 'video', mediaId: segs[1] };
+    }
+    if (segs.includes('videos') && /^\d{5,}$/.test(segs[segs.length - 1])) {
       return { platform: 'facebook', kind: 'video', mediaId: segs[segs.length - 1] };
     }
     if (segs[0] === 'stories') return { platform: 'facebook', kind: 'story', pageId: segs[1], mediaId: segs[2] };
@@ -143,6 +163,13 @@ function parseTarget(raw) {
         pageId: u.searchParams.get('id'),
       };
     }
+    // Page profile: /username, /username/videos, /username/reels
+    if (
+      segs.length >= 1 &&
+      !['share', 'pages', 'groups', 'marketplace', 'events', 'help', 'login', 'watch'].includes(segs[0])
+    ) {
+      return { platform: 'facebook', kind: 'profile', username: segs[0], mediaId: null };
+    }
     return { platform: 'facebook', kind: 'unknown' };
   }
   return { platform: 'unknown', kind: 'unknown' };
@@ -153,9 +180,7 @@ async function fetchText(url, headers = {}) {
     method: 'GET',
     redirect: 'follow',
     headers: {
-      'User-Agent': BROWSER_UA,
-      Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
+      ...FB_HEADERS,
       ...headers,
     },
   });
@@ -163,8 +188,40 @@ async function fetchText(url, headers = {}) {
   return { status: res.status, text };
 }
 
+function pageHandleFromUrl(raw) {
+  try {
+    const u = new URL(raw);
+    const segs = u.pathname.split('/').filter(Boolean);
+    if (!segs.length) return null;
+    const first = segs[0];
+    if (
+      ['watch', 'reel', 'reels', 'stories', 'story.php', 'video.php', 'share', 'pages', 'groups', 'marketplace', 'events', 'help'].includes(
+        first
+      )
+    ) {
+      return null;
+    }
+    // numeric profile id is ok; username-like handle is ok
+    return first;
+  } catch {
+    return null;
+  }
+}
+
+function pageMetaFromHtml(html) {
+  const title = (html.match(/property="og:title"\s+content="([^"]+)"/) || html.match(/content="([^"]+)"\s+property="og:title"/) || [])[1];
+  const image = (html.match(/property="og:image"\s+content="([^"]+)"/) || html.match(/content="([^"]+)"\s+property="og:image"/) || [])[1];
+  const desc = (html.match(/property="og:description"\s+content="([^"]+)"/) || [])[1];
+  return {
+    title: title ? title.replace(/&amp;/g, '&').replace(/&#x27;/g, "'") : '',
+    image: image ? image.replace(/&amp;/g, '&') : '',
+    description: desc ? desc.replace(/&amp;/g, '&') : '',
+  };
+}
+
 async function resolveFacebook(parsed, originalUrl) {
   const candidates = [];
+
   if (parsed.kind === 'video' && parsed.mediaId) {
     candidates.push(`https://www.facebook.com/watch/?v=${parsed.mediaId}`);
     if (originalUrl.includes('/videos/')) candidates.push(originalUrl);
@@ -182,35 +239,73 @@ async function resolveFacebook(parsed, originalUrl) {
       );
     }
   }
+
+  // Page / profile: load the page, then its videos tab (where mp4s actually live)
+  const handle = pageHandleFromUrl(originalUrl);
+  if (handle) {
+    candidates.push(`https://www.facebook.com/${handle}/videos`);
+    candidates.push(`https://www.facebook.com/${handle}/reels`);
+    candidates.push(`https://www.facebook.com/${handle}`);
+  }
+
   if (!candidates.length) candidates.push(originalUrl);
 
   const errors = [];
+  let pageMeta = null;
+
   for (const url of candidates) {
     try {
       const res = await fetchText(url);
+      if (!pageMeta) {
+        const meta = pageMetaFromHtml(res.text);
+        if (meta.title) pageMeta = { ...meta, handle };
+      }
       const items = extractMediaUrls(res.text);
-      const videos = items.filter((i) => i.type === 'video');
+      const videos = items.filter((i) => i.type === 'video' || i.url.includes('.mp4'));
       const usable = videos.length ? videos : items;
       if (usable.length) {
         return {
           ok: true,
           platform: 'facebook',
-          kind: parsed.kind,
-          items: usable.slice(0, 12).map((i) => ({ ...i, source: 'facebook-html' })),
+          kind: parsed.kind === 'profile' || !parsed.kind ? 'page' : parsed.kind,
+          items: usable.slice(0, 16).map((i) => ({ ...i, source: 'facebook-html' })),
           source: 'html-extract',
           viaUrl: url,
+          page: pageMeta,
         };
       }
-      errors.push(`${url} → no media`);
+      errors.push(`${url} → HTTP ${res.status}, no media`);
     } catch (e) {
-      errors.push(`${url} → ${e.message}`);
+      errors.push(`${url} → ${e && e.message ? e.message : e}`);
     }
   }
+
+  if (pageMeta && pageMeta.image) {
+    return {
+      ok: true,
+      platform: 'facebook',
+      kind: 'page',
+      items: [
+        {
+          type: 'image',
+          url: pageMeta.image,
+          id: hashId(pageMeta.image),
+          username: handle || '',
+          caption: pageMeta.title || '',
+          source: 'page-cover',
+        },
+      ],
+      source: 'page-meta',
+      page: pageMeta,
+      hint: 'Showing page cover. For videos, paste a specific /watch/?v= or /videos/ link.',
+    };
+  }
+
   return {
     ok: false,
     platform: 'facebook',
     error: 'Could not extract Facebook media from page HTML.',
-    hint: 'Public watch/?v= and /videos/ links work best.',
+    hint: 'Public watch/?v=, /videos/, and page /videos tabs work best with a direct media link.',
     details: errors,
   };
 }

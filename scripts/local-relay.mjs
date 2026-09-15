@@ -123,7 +123,8 @@ function parseTarget(raw) {
   }
   if (fb) {
     if (segs[0] === 'watch') return { platform: 'facebook', kind: 'video', mediaId: u.searchParams.get('v') };
-    if (segs[0] === 'reel' || segs.includes('videos')) {
+    if (segs[0] === 'reel' && segs[1]) return { platform: 'facebook', kind: 'video', mediaId: segs[1] };
+    if (segs.includes('videos') && /^\d{5,}$/.test(segs[segs.length - 1])) {
       return { platform: 'facebook', kind: 'video', mediaId: segs[segs.length - 1] };
     }
     if (segs[0] === 'stories') return { platform: 'facebook', kind: 'story', pageId: segs[1], mediaId: segs[2] };
@@ -135,18 +136,33 @@ function parseTarget(raw) {
         pageId: u.searchParams.get('id'),
       };
     }
+    if (segs.length >= 1) {
+      return { platform: 'facebook', kind: 'profile', username: segs[0] };
+    }
     return { platform: 'facebook', kind: 'unknown' };
   }
   return { platform: 'unknown', kind: 'unknown' };
 }
 
+const FB_HEADERS = {
+  'User-Agent': BROWSER_UA,
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1',
+  'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+};
+
 async function fetchText(url, headers = {}) {
   const res = await fetch(url, {
     redirect: 'follow',
     headers: {
-      'User-Agent': BROWSER_UA,
-      Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
+      ...FB_HEADERS,
       ...headers,
     },
   });
@@ -160,19 +176,25 @@ async function resolveFacebook(parsed, originalUrl) {
     if (originalUrl.includes('/videos/')) candidates.push(originalUrl);
     candidates.push(`https://www.facebook.com/reel/${parsed.mediaId}`);
   }
+  if (parsed.kind === 'profile' && parsed.username) {
+    const h = parsed.username;
+    candidates.push(`https://www.facebook.com/${h}/videos`);
+    candidates.push(`https://www.facebook.com/${h}/reels`);
+    candidates.push(`https://www.facebook.com/${h}`);
+  }
   if (!candidates.length) candidates.push(originalUrl);
 
   for (const url of candidates) {
     try {
       const res = await fetchText(url);
       const items = extractMediaUrls(res.text);
-      const videos = items.filter((i) => i.type === 'video');
+      const videos = items.filter((i) => i.type === 'video' || i.url.includes('.mp4'));
       const usable = videos.length ? videos : items;
       if (usable.length) {
         return {
           ok: true,
           platform: 'facebook',
-          items: usable.slice(0, 12).map((i) => ({ ...i, source: 'facebook-html' })),
+          items: usable.slice(0, 16).map((i) => ({ ...i, source: 'facebook-html' })),
           source: 'html-extract',
           viaUrl: url,
         };

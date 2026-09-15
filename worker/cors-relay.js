@@ -37,6 +37,20 @@ const ALLOW_HOST_SUFFIXES = [
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
+const FB_HEADERS = {
+  'User-Agent': BROWSER_UA,
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1',
+  'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+};
+
 const ANDROID_UA =
   'Instagram 192.0.0.35.78 Android (29/10; 420dpi; 1080x2129; samsung; SM-G973F; beyond1; exynos9820; en_US; 301484484)';
 
@@ -205,14 +219,21 @@ function parseTarget(raw) {
         pageId: u.searchParams.get('id'),
       };
     }
+    if (segs[0] === 'reel' && segs[1]) {
+      return { platform: 'facebook', kind: 'video', mediaId: segs[1] };
+    }
+    if (segs.includes('videos') && /^\d{5,}$/.test(segs[segs.length - 1])) {
+      return { platform: 'facebook', kind: 'video', mediaId: segs[segs.length - 1] };
+    }
     if (segs[0] === 'watch') {
       return { platform: 'facebook', kind: 'video', mediaId: u.searchParams.get('v') };
     }
-    if (segs[0] === 'reel' || segs[0] === 'videos' || segs.includes('videos')) {
-      return { platform: 'facebook', kind: 'video', mediaId: segs[segs.length - 1] };
-    }
     if (segs[0] === 'share') {
       return { platform: 'facebook', kind: 'share', mediaId: segs.slice(1).join('/') };
+    }
+    // page profile /username or /username/videos
+    if (segs.length >= 1) {
+      return { platform: 'facebook', kind: 'profile', username: segs[0] };
     }
     return { platform: 'facebook', kind: 'unknown' };
   }
@@ -225,9 +246,7 @@ async function fetchText(url, headers = {}) {
     method: 'GET',
     redirect: 'follow',
     headers: {
-      'User-Agent': BROWSER_UA,
-      Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
+      ...FB_HEADERS,
       ...headers,
     },
   });
@@ -242,7 +261,6 @@ async function resolveFacebook(parsed, originalUrl) {
     candidates.push(`https://www.facebook.com/watch/?v=${parsed.mediaId}`);
     candidates.push(`https://www.facebook.com/${parsed.mediaId.includes('/') ? parsed.mediaId : `video.php?v=${parsed.mediaId}`}`);
     candidates.push(`https://www.facebook.com/reel/${parsed.mediaId}`);
-    // page/videos path
     if (originalUrl.includes('/videos/')) candidates.push(originalUrl);
   }
   if (parsed.kind === 'story') {
@@ -261,27 +279,33 @@ async function resolveFacebook(parsed, originalUrl) {
     candidates.push(originalUrl);
     candidates.push(`https://www.facebook.com/share/${parsed.mediaId}`);
   }
+  if (parsed.kind === 'profile' && parsed.username) {
+    const h = parsed.username;
+    candidates.push(`https://www.facebook.com/${h}/videos`);
+    candidates.push(`https://www.facebook.com/${h}/reels`);
+    candidates.push(`https://www.facebook.com/${h}`);
+  }
   if (!candidates.length) candidates.push(originalUrl);
 
   const errors = [];
   for (const url of candidates) {
     try {
       const res = await fetchText(url);
-      if (res.status >= 400 && res.status !== 400) {
+      if (res.status >= 500) {
         errors.push(`${url} → HTTP ${res.status}`);
         continue;
       }
       const items = extractMediaUrls(res.text);
-      const videos = items.filter((i) => i.type === 'video');
+      const videos = items.filter((i) => i.type === 'video' || i.url.includes('.mp4'));
       const usable = videos.length ? videos : items;
       if (usable.length) {
         return {
           ok: true,
           platform: 'facebook',
-          kind: parsed.kind,
-          items: usable.slice(0, 12).map((i) => ({
+          kind: parsed.kind === 'profile' ? 'page' : parsed.kind,
+          items: usable.slice(0, 16).map((i) => ({
             ...i,
-            username: parsed.pageId || '',
+            username: parsed.username || parsed.pageId || '',
             source: 'facebook-html',
           })),
           source: 'html-extract',

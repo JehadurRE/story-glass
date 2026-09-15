@@ -145,9 +145,16 @@ function parseFacebook(url, base) {
     return result;
   }
 
-  if (segments.length >= 1) {
+  // Page profile: /username or /username/videos
+  if (
+    segments.length >= 1 &&
+    !['share', 'pages', 'groups', 'marketplace', 'events', 'help', 'login', 'watch', 'reel', 'stories'].includes(
+      segments[0]
+    )
+  ) {
     result.kind = 'profile';
-    result.username = segments[segments.length - 1];
+    result.username = segments[0];
+    return result;
   }
 
   return result;
