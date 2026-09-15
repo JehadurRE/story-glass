@@ -615,7 +615,7 @@ function decodeJwtPayload(token) {
 
 async function resolveViaBraveDown(parsed, originalUrl) {
   let target = originalUrl;
-  if (parsed.username) {
+  if (parsed.platform === 'instagram' && parsed.username && !originalUrl.includes('/stories/')) {
     target = `https://www.instagram.com/${parsed.username}/`;
   }
 

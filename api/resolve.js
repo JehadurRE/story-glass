@@ -329,6 +329,7 @@ async function resolveFacebook(parsed, originalUrl, options = {}) {
     // 1) Profile HTML often embeds story_bucket when a live story exists
     let liveStory = null;
     let homeHtml = '';
+    let notesBd = '';
     try {
       const home = await fetchFacebook(`https://www.facebook.com/${handle}`);
       homeHtml = home.text;
@@ -377,6 +378,29 @@ async function resolveFacebook(parsed, originalUrl, options = {}) {
     }
 
     if (liveStory) {
+      // BraveDown fallback (same as IG path) — full current story
+      try {
+        const bd = await resolveViaBraveDown(parsed, originalUrl);
+        if (bd.ok && bd.items?.length) {
+          return {
+            ...bd,
+            platform: 'facebook',
+            kind: 'story',
+            page: pageMeta,
+            hasLiveStory: true,
+            items: bd.items.map((i) => ({
+              ...i,
+              username: i.username || handle,
+              authorName: i.authorName || pageMeta?.title || '',
+              platform: 'Facebook',
+            })),
+          };
+        }
+        if (bd.error) notesBd = bd.error;
+      } catch (e) {
+        notesBd = e && e.message ? e.message : String(e);
+      }
+
       // First-party preview stills next to story_bucket (logged-out HTML)
       const previews = extractStoryPreviews(homeHtml);
       if (previews.length) {
@@ -411,7 +435,30 @@ async function resolveFacebook(parsed, originalUrl, options = {}) {
         page: pageMeta,
         optional: 'library',
         hasLiveStory: true,
+        details: notesBd ? [notesBd] : undefined,
       };
+    }
+
+    // No live story — still try BraveDown (some pages expose story only via their API)
+    try {
+      const bd = await resolveViaBraveDown(parsed, originalUrl);
+      if (bd.ok && bd.items?.length) {
+        return {
+          ...bd,
+          platform: 'facebook',
+          kind: 'story',
+          page: pageMeta,
+          hasLiveStory: true,
+          items: bd.items.map((i) => ({
+            ...i,
+            username: i.username || handle,
+            authorName: i.authorName || pageMeta?.title || '',
+            platform: 'Facebook',
+          })),
+        };
+      }
+    } catch {
+      /* ignore */
     }
 
     return {
@@ -694,7 +741,8 @@ function decodeJwtPayload(token) {
 
 async function resolveViaBraveDown(parsed, originalUrl) {
   let target = originalUrl;
-  if (parsed.username) {
+  // Instagram profile shorthand only — never rewrite Facebook handles
+  if (parsed.platform === 'instagram' && parsed.username && !originalUrl.includes('/stories/')) {
     target = `https://www.instagram.com/${parsed.username}/`;
   }
 

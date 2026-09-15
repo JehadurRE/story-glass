@@ -261,6 +261,26 @@ async function resolveFacebook(parsed, originalUrl, opts = {}) {
       candidates.push(`https://www.facebook.com/stories/${h}`);
       if (live) {
         hasLiveStory = true;
+        // BraveDown fallback first (full story, same as IG)
+        try {
+          const bd = await resolveViaBraveDown(parsed, originalUrl);
+          if (bd.ok && bd.items?.length) {
+            return {
+              ...bd,
+              platform: 'facebook',
+              page: pageMeta,
+              hasLiveStory: true,
+              items: bd.items.map((i) => ({
+                ...i,
+                username: i.username || h,
+                authorName: i.authorName || pageMeta?.title || '',
+                platform: 'Facebook',
+              })),
+            };
+          }
+        } catch {
+          /* ignore */
+        }
         const previews = extractStoryPreviews(homeHtml);
         if (previews.length) {
           return {
@@ -385,7 +405,7 @@ function decodeJwtPayload(token) {
 
 async function resolveViaBraveDown(parsed, originalUrl) {
   let target = originalUrl;
-  if (parsed.username) {
+  if (parsed.platform === 'instagram' && parsed.username && !originalUrl.includes('/stories/')) {
     target = `https://www.instagram.com/${parsed.username}/`;
   }
 
