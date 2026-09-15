@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="markGlow" x1="0" y1="128" x2="128" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#833AB4"/>
+      <stop offset="0.3" stop-color="#C13584"/>
+      <stop offset="0.6" stop-color="#E1306C"/>
+      <stop offset="0.8" stop-color="#FD1D1D"/>
+      <stop offset="1" stop-color="#FCAF45"/>
+    </linearGradient>
+    <linearGradient id="markSheen" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.3"/>
+    </linearGradient>
+    <linearGradient id="fbBlue" x1="20" y1="108" x2="108" y2="20" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1877F2"/>
+      <stop offset="0.6" stop-color="#0866FF"/>
+      <stop offset="1" stop-color="#00D2FF"/>
+    </linearGradient>
+    <filter id="outerGlow" x="-16" y="-8" width="160" height="160" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Dark container background with subtle bevel -->
+  <rect x="10" y="10" width="108" height="108" rx="32" fill="#0E1118"/>
+  <rect x="10" y="10" width="108" height="108" rx="32" stroke="#232936" stroke-width="2"/>
+
+  <!-- Outer radiant Instagram story gradient ring -->
+  <rect x="14" y="14" width="100" height="100" rx="28" fill="url(#markGlow)"/>
+
+  <!-- Frosted glass plate -->
+  <rect x="19" y="19" width="90" height="90" rx="23" fill="#121622" fill-opacity="0.85"/>
+  <rect x="19" y="19" width="90" height="90" rx="23" stroke="url(#markSheen)" stroke-width="2"/>
+
+  <!-- Central Camera / Story Aperture Ring -->
+  <circle cx="64" cy="64" r="28" stroke="url(#markGlow)" stroke-width="7" fill="none"/>
+  
+  <!-- Inner optical glass lens with cyan-blue reflection -->
+  <circle cx="64" cy="64" r="18" fill="url(#fbBlue)" fill-opacity="0.22"/>
+  <circle cx="64" cy="64" r="17" stroke="#ffffff" stroke-opacity="0.55" stroke-width="2" fill="none"/>
+
+  <!-- Diagonal glass refraction flare -->
+  <path d="M26 38 C42 26 86 26 102 38 C86 52 42 52 26 38 Z" fill="#ffffff" fill-opacity="0.2"/>
+  <path d="M36 86 C50 78 78 78 92 86 C78 92 50 92 36 86 Z" fill="#ffffff" fill-opacity="0.08"/>
+
+  <!-- Active Story Glint / Flash Indicator -->
+  <circle cx="90" cy="38" r="6.5" fill="#FCAF45"/>
+  <circle cx="90" cy="38" r="3" fill="#ffffff"/>
+</svg>

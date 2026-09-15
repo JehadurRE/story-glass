@@ -1,0 +1,162 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" fill="none">
+  <defs>
+    <!-- Background Gradients -->
+    <radialGradient id="bgGlow1" cx="20%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#833AB4" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#090B10" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bgGlow2" cx="80%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#E1306C" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#090B10" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bgGlow3" cx="50%" cy="90%" r="50%">
+      <stop offset="0%" stop-color="#1877F2" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#090B10" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Brand Gradients -->
+    <linearGradient id="igGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#833AB4"/>
+      <stop offset="35%" stop-color="#C13584"/>
+      <stop offset="65%" stop-color="#E1306C"/>
+      <stop offset="85%" stop-color="#FD1D1D"/>
+      <stop offset="100%" stop-color="#FCAF45"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#E1306C"/>
+      <stop offset="40%" stop-color="#FD1D1D"/>
+      <stop offset="100%" stop-color="#FCAF45"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.4"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Base background -->
+  <rect width="1200" height="630" fill="#090B10"/>
+  <rect width="1200" height="630" fill="url(#bgGlow1)"/>
+  <rect width="1200" height="630" fill="url(#bgGlow2)"/>
+  <rect width="1200" height="630" fill="url(#bgGlow3)"/>
+
+  <!-- Subtle grid pattern -->
+  <g stroke="#ffffff" stroke-opacity="0.03" stroke-width="1">
+    <path d="M0 70 H1200 M0 140 H1200 M0 210 H1200 M0 280 H1200 M0 350 H1200 M0 420 H1200 M0 490 H1200 M0 560 H1200"/>
+    <path d="M100 0 V630 M200 0 V630 M300 0 V630 M400 0 V630 M500 0 V630 M600 0 V630 M700 0 V630 M800 0 V630 M900 0 V630 M1000 0 V630 M1100 0 V630"/>
+  </g>
+
+  <!-- Left Content Area -->
+  <g transform="translate(80, 80)">
+    <!-- Brand Lockup -->
+    <g>
+      <!-- Logo Mark -->
+      <rect x="0" y="0" width="56" height="56" rx="16" fill="#121622" stroke="#232936" stroke-width="1.5"/>
+      <rect x="3" y="3" width="50" height="50" rx="13" fill="url(#igGradient)"/>
+      <rect x="6" y="6" width="44" height="44" rx="10" fill="#121622" fill-opacity="0.88" stroke="url(#sheen)" stroke-width="1.2"/>
+      <circle cx="28" cy="28" r="13" stroke="url(#igGradient)" stroke-width="3" fill="none"/>
+      <circle cx="28" cy="28" r="8" fill="#1877F2" fill-opacity="0.3"/>
+      <circle cx="39" cy="17" r="2.8" fill="#FCAF45"/>
+      
+      <!-- Brand Name -->
+      <text x="72" y="39" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="34" font-weight="800" letter-spacing="-0.5">
+        <tspan fill="#F8FAFC">Story</tspan><tspan fill="url(#textGrad)">Glass</tspan>
+      </text>
+    </g>
+
+    <!-- Hero Eyebrow Pill -->
+    <g transform="translate(0, 84)">
+      <rect x="0" y="0" width="360" height="36" rx="18" fill="#1A1F2E" stroke="#2D3748" stroke-width="1"/>
+      <circle cx="18" cy="18" r="5" fill="#10B981"/>
+      <text x="32" y="23" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600" fill="#E2E8F0">
+        Instagram &amp; Facebook · Free · No Account
+      </text>
+    </g>
+
+    <!-- Main Title -->
+    <text x="0" y="195" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="54" font-weight="800" fill="#FFFFFF" letter-spacing="-1">
+      Watch public stories
+    </text>
+    <text x="0" y="260" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="54" font-weight="800" fill="url(#textGrad)" letter-spacing="-1">
+      without the app.
+    </text>
+
+    <!-- Subtitle / Hook -->
+    <text x="0" y="325" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="400" fill="#94A3B8" width="580">
+      View public stories and reels without showing up in viewer lists.
+    </text>
+    <text x="0" y="355" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="400" fill="#94A3B8">
+      No login, no tracking, built-in HD video playback &amp; downloads.
+    </text>
+
+    <!-- Feature Badges Row -->
+    <g transform="translate(0, 400)">
+      <rect x="0" y="0" width="135" height="38" rx="10" fill="#131722" stroke="#E1306C" stroke-opacity="0.4" stroke-width="1.5"/>
+      <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#F43F5E">● Instagram</text>
+
+      <rect x="150" y="0" width="130" height="38" rx="10" fill="#131722" stroke="#1877F2" stroke-opacity="0.4" stroke-width="1.5"/>
+      <text x="166" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#38BDF8">● Facebook</text>
+
+      <rect x="295" y="0" width="170" height="38" rx="10" fill="#131722" stroke="#10B981" stroke-opacity="0.4" stroke-width="1.5"/>
+      <text x="311" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#34D399">● Zero Viewer List</text>
+    </g>
+  </g>
+
+  <!-- Right Visual: Sleek Floating Glass Mockup Card -->
+  <g transform="translate(740, 75)">
+    <!-- Glow behind phone card -->
+    <rect x="-10" y="-10" width="380" height="490" rx="38" fill="url(#igGradient)" opacity="0.18" filter="blur(20px)"/>
+    
+    <!-- Phone / Player frame -->
+    <rect x="0" y="0" width="360" height="470" rx="32" fill="#101420" stroke="#2D3748" stroke-width="2"/>
+    
+    <!-- Story Progress Rail -->
+    <g transform="translate(24, 20)">
+      <rect x="0" y="0" width="58" height="4" rx="2" fill="#FFFFFF"/>
+      <rect x="64" y="0" width="58" height="4" rx="2" fill="#FFFFFF"/>
+      <rect x="128" y="0" width="58" height="4" rx="2" fill="#FFFFFF" fill-opacity="0.8"/>
+      <rect x="192" y="0" width="58" height="4" rx="2" fill="#FFFFFF" fill-opacity="0.25"/>
+      <rect x="256" y="0" width="56" height="4" rx="2" fill="#FFFFFF" fill-opacity="0.25"/>
+    </g>
+
+    <!-- User Header -->
+    <g transform="translate(24, 38)">
+      <circle cx="16" cy="16" r="16" fill="url(#igGradient)"/>
+      <circle cx="16" cy="16" r="14" fill="#161B26"/>
+      <circle cx="16" cy="16" r="10" fill="#E2E8F0"/>
+      <text x="42" y="16" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">nasa</text>
+      <text x="42" y="29" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="500" fill="#94A3B8">3h ago · Story 3 of 5</text>
+      <rect x="260" y="4" width="52" height="24" rx="6" fill="#1E293B"/>
+      <text x="272" y="20" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" fill="#38BDF8">Save</text>
+    </g>
+
+    <!-- Video Stage Media Container -->
+    <g transform="translate(24, 86)">
+      <rect x="0" y="0" width="312" height="320" rx="18" fill="#181E2E" stroke="#2D3748" stroke-width="1"/>
+      
+      <!-- Planet / Space art in mockup -->
+      <circle cx="156" cy="150" r="85" fill="url(#igGradient)" opacity="0.85"/>
+      <circle cx="156" cy="150" r="75" fill="#0F172A"/>
+      <ellipse cx="156" cy="150" rx="110" ry="25" fill="none" stroke="#FCAF45" stroke-width="4" transform="rotate(-20 156 150)"/>
+      
+      <!-- Play button overlay -->
+      <circle cx="156" cy="150" r="28" fill="#000000" fill-opacity="0.6"/>
+      <polygon points="150,138 168,150 150,162" fill="#FFFFFF"/>
+
+      <text x="20" y="300" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600" fill="#FFFFFF">
+        James Webb Space Telescope Deep Field
+      </text>
+    </g>
+
+    <!-- Bottom Controls -->
+    <g transform="translate(24, 420)">
+      <text x="6" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#94A3B8">
+        0:12 / 0:15
+      </text>
+      <rect x="230" y="6" width="82" height="26" rx="6" fill="#10B981" fill-opacity="0.15" stroke="#10B981" stroke-width="1"/>
+      <text x="240" y="23" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#34D399">
+        Anonymous
+      </text>
+    </g>
+  </g>
+</svg>

@@ -1,26 +1,153 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" prefix="og: https://ogp.me/ns#">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StoryGlass — Facebook &amp; Instagram Story Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>StoryGlass — Anonymous Facebook &amp; Instagram Story Viewer | Free &amp; No Login</title>
     <meta
       name="description"
-      content="View public Facebook and Instagram stories without showing up in the viewer list. No account, no app. Paste a link and watch — avoid accidental story views and awkward blocks."
+      content="Watch public Instagram and Facebook stories, reels, and videos anonymously without showing up in viewer lists. Free, in-browser story player with HD downloads and zero tracking."
     />
-    <meta name="theme-color" content="#fafafa" />
-    <meta name="color-scheme" content="light" />
+    <meta
+      name="keywords"
+      content="instagram story viewer, facebook story viewer, watch instagram stories anonymously, anonymous story viewer, download ig stories, view facebook stories, no login, story glass, instagram anonymous viewer, ig story saver, download facebook video, anonymous reel viewer"
+    />
+    <meta name="author" content="JehadurRE" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <link rel="canonical" href="https://story-glass.vercel.app/" />
+
+    <!-- Mobile & PWA Theme Colors -->
+    <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0d0f15" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="StoryGlass" />
+    <meta name="application-name" content="StoryGlass" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://story-glass.vercel.app/" />
+    <meta property="og:title" content="StoryGlass — Watch Public Stories Without The App" />
+    <meta
+      property="og:description"
+      content="View public Facebook &amp; Instagram stories in high definition without showing up in the viewer list. Free, no account, direct HD downloads."
+    />
+    <meta property="og:image" content="https://story-glass.vercel.app/assets/og-image.png" />
+    <meta property="og:image:secure_url" content="https://story-glass.vercel.app/assets/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="StoryGlass — Anonymous Facebook and Instagram Story Viewer" />
+    <meta property="og:site_name" content="StoryGlass" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://story-glass.vercel.app/" />
+    <meta name="twitter:title" content="StoryGlass — Anonymous Story Viewer" />
+    <meta
+      name="twitter:description"
+      content="Watch public Instagram &amp; Facebook stories without the viewer list. Free, no sign-up, HD playback."
+    />
+    <meta name="twitter:image" content="https://story-glass.vercel.app/assets/og-image.png" />
+    <meta name="twitter:image:alt" content="StoryGlass — Anonymous Facebook &amp; Instagram Story Viewer" />
+
+    <!-- Icons & Manifest -->
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="./assets/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png" />
+    <link rel="manifest" href="./site.webmanifest" />
+
     <link rel="stylesheet" href="./css/styles.css" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='1' x2='1' y2='0'%3E%3Cstop stop-color='%23833AB4'/%3E%3Cstop offset='.5' stop-color='%23E1306C'/%3E%3Cstop offset='1' stop-color='%23FCAF45'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='white' stroke-width='2.5'/%3E%3C/svg%3E" />
+
+    <!-- Structured Data / Schema.org -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "WebApplication",
-        "name": "StoryGlass",
-        "applicationCategory": "MultimediaApplication",
-        "operatingSystem": "Any",
-        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-        "description": "Facebook and Instagram story viewer. Paste a public story link and watch media in the browser without creating an account."
+        "@graph": [
+          {
+            "@type": "WebApplication",
+            "@id": "https://story-glass.vercel.app/#webapp",
+            "name": "StoryGlass",
+            "url": "https://story-glass.vercel.app/",
+            "applicationCategory": "MultimediaApplication",
+            "operatingSystem": "Any",
+            "browserRequirements": "Requires JavaScript. Requires modern HTML5 browser.",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            },
+            "description": "Watch public Facebook and Instagram stories anonymously in the browser without creating an account or showing up in viewer lists.",
+            "screenshot": "https://story-glass.vercel.app/assets/og-image.png",
+            "featureList": [
+              "Anonymous Instagram story viewer",
+              "Facebook public video and story player",
+              "No account or login required",
+              "In-browser story progress rail",
+              "Direct HD media downloads",
+              "Automated fallback providers"
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://story-glass.vercel.app/#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Will my name show up in their story viewer list?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "When StoryGlass loads a Facebook public video or story from page HTML, it does not use your Facebook account — so you never appear in the viewer list. For Instagram, public media is resolved server-side without transmitting your personal credentials."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Do I need to sign up or create an account?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Simply paste a public link and watch. StoryGlass requires no registration, email, or login."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Which links work best on StoryGlass?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Facebook public videos, watch links, page video tabs, and Instagram story or profile links."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Can I save or download stories?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes, StoryGlass provides direct HD save buttons for media you have permission to view or retain."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Does StoryGlass work on mobile devices?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes, StoryGlass is fully responsive and works in any modern mobile browser on iOS and Android."
+                }
+              }
+            ]
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://story-glass.vercel.app/#organization",
+            "name": "StoryGlass",
+            "url": "https://story-glass.vercel.app/",
+            "logo": "https://story-glass.vercel.app/assets/logo.svg"
+          }
+        ]
       }
     </script>
   </head>
@@ -31,17 +158,27 @@
       <div class="shell header-inner">
         <a class="brand" href="./" aria-label="StoryGlass home">
           <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32" width="28" height="28">
+            <svg viewBox="0 0 32 32" width="30" height="30" fill="none">
               <defs>
-                <linearGradient id="brandGrad" x1="0" y1="1" x2="1" y2="0">
+                <linearGradient id="brandGrad" x1="0" y1="32" x2="32" y2="0" gradientUnits="userSpaceOnUse">
                   <stop stop-color="#833AB4" />
-                  <stop offset="0.5" stop-color="#E1306C" />
+                  <stop offset="0.35" stop-color="#C13584" />
+                  <stop offset="0.65" stop-color="#E1306C" />
                   <stop offset="1" stop-color="#FCAF45" />
                 </linearGradient>
+                <linearGradient id="brandSheen" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#ffffff" stop-opacity="0.45" />
+                  <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.05" />
+                  <stop offset="1" stop-color="#ffffff" stop-opacity="0.25" />
+                </linearGradient>
               </defs>
-              <rect width="32" height="32" rx="9" fill="url(#brandGrad)" />
-              <circle cx="16" cy="16" r="7" fill="none" stroke="#fff" stroke-width="2.4" />
-              <circle cx="23" cy="9" r="1.8" fill="#fff" />
+              <rect x="1" y="1" width="30" height="30" rx="9" fill="#0D0F15" />
+              <rect x="2.5" y="2.5" width="27" height="27" rx="8" fill="url(#brandGrad)" />
+              <rect x="4.5" y="4.5" width="23" height="23" rx="6.5" fill="#121520" fill-opacity="0.88" stroke="url(#brandSheen)" stroke-width="1" />
+              <circle cx="16" cy="16" r="7" stroke="url(#brandGrad)" stroke-width="2" fill="none" />
+              <circle cx="16" cy="16" r="4.5" fill="#1877F2" fill-opacity="0.3" stroke="#ffffff" stroke-opacity="0.6" stroke-width="0.8" />
+              <circle cx="22.5" cy="9.5" r="1.6" fill="#FCAF45" />
+              <circle cx="22.5" cy="9.5" r="0.7" fill="#ffffff" />
             </svg>
           </span>
           <span class="brand-text">StoryGlass</span>
@@ -371,7 +508,14 @@
     <footer class="site-footer">
       <div class="shell footer-inner">
         <div class="footer-brand">
-          <span class="brand-mark-sm" aria-hidden="true"></span>
+          <span class="brand-mark-sm" aria-hidden="true">
+            <svg viewBox="0 0 28 28" width="28" height="28" fill="none">
+              <rect width="28" height="28" rx="8" fill="#0D0F15" />
+              <rect x="2" y="2" width="24" height="24" rx="7" fill="url(#brandGrad)" />
+              <circle cx="14" cy="14" r="6" stroke="#ffffff" stroke-width="2" fill="none" />
+              <circle cx="19.5" cy="8.5" r="1.5" fill="#FCAF45" />
+            </svg>
+          </span>
           <div>
             <strong>StoryGlass</strong>
             <p>
