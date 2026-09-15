@@ -1,41 +1,46 @@
 /**
- * Story segment player: Instagram-style progress rail, autoplay, keyboard.
+ * Instagram-style story player.
+ * Segmented progress, tap zones, pause/mute, fullscreen, keyboard.
  */
 export class StoryPlayer {
-  /**
-   * @param {{
-   *   root: HTMLElement,
-   *   mediaEl: HTMLElement,
-   *   railEl: HTMLElement,
-   *   metaEl: HTMLElement,
-   *   onIndexChange?: (i: number, total: number) => void
-   * }} els
-   */
   constructor(els) {
     this.root = els.root;
     this.mediaEl = els.mediaEl;
     this.railEl = els.railEl;
     this.metaEl = els.metaEl;
     this.onIndexChange = els.onIndexChange || (() => {});
+
     this.items = [];
     this.index = 0;
     this.timer = null;
     this.videoCleanup = null;
     this.durationMs = 5000;
+    this.paused = false;
+    this.muted = true;
+    this._imageStart = 0;
+    this._imageElapsed = 0;
+    this._bound = false;
+
     this._onKey = this._onKey.bind(this);
-    this._onResize = null;
+    this._onZonePrev = () => this.prev();
+    this._onZoneNext = () => this.next();
+    this._onPlay = () => this.togglePause();
+    this._onMute = () => this.toggleMute();
+    this._onFs = () => this.toggleFullscreen();
   }
 
   setItems(items) {
-    this.stop();
+    this.teardown();
     this.items = (items || []).filter((i) => i && i.url);
     this.index = 0;
-    this.renderRail();
+    this.paused = false;
+    this._imageElapsed = 0;
+    this._bindChrome();
     if (this.items.length) this.show(0);
     else this.renderEmpty();
   }
 
-  stop() {
+  teardown() {
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
@@ -44,11 +49,46 @@ export class StoryPlayer {
       this.videoCleanup();
       this.videoCleanup = null;
     }
+  }
+
+  stop() {
+    this.teardown();
+    this._unbindChrome();
     document.removeEventListener('keydown', this._onKey);
   }
 
   startKeyboard() {
     document.addEventListener('keydown', this._onKey);
+    this._bindChrome();
+  }
+
+  _bindChrome() {
+    if (this._bound) return;
+    const prev = document.getElementById('zone-prev');
+    const next = document.getElementById('zone-next');
+    const play = document.getElementById('player-play');
+    const mute = document.getElementById('player-mute');
+    const fs = document.getElementById('player-fullscreen');
+    if (prev) prev.addEventListener('click', this._onZonePrev);
+    if (next) next.addEventListener('click', this._onZoneNext);
+    if (play) play.addEventListener('click', this._onPlay);
+    if (mute) mute.addEventListener('click', this._onMute);
+    if (fs) fs.addEventListener('click', this._onFs);
+    this._bound = true;
+  }
+
+  _unbindChrome() {
+    const prev = document.getElementById('zone-prev');
+    const next = document.getElementById('zone-next');
+    const play = document.getElementById('player-play');
+    const mute = document.getElementById('player-mute');
+    const fs = document.getElementById('player-fullscreen');
+    if (prev) prev.removeEventListener('click', this._onZonePrev);
+    if (next) next.removeEventListener('click', this._onZoneNext);
+    if (play) play.removeEventListener('click', this._onPlay);
+    if (mute) mute.removeEventListener('click', this._onMute);
+    if (fs) fs.removeEventListener('click', this._onFs);
+    this._bound = false;
   }
 
   _onKey(e) {
@@ -62,8 +102,18 @@ export class StoryPlayer {
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
       this.prev();
+    } else if (e.key === ' ' || e.key === 'k') {
+      e.preventDefault();
+      this.togglePause();
+    } else if (e.key === 'm') {
+      e.preventDefault();
+      this.toggleMute();
+    } else if (e.key === 'f') {
+      e.preventDefault();
+      this.toggleFullscreen();
     } else if (e.key === 'Escape') {
-      this.stop();
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else this.pause();
     }
   }
 
@@ -77,39 +127,123 @@ export class StoryPlayer {
     else this.show(this.items.length - 1);
   }
 
+  togglePause() {
+    this.paused ? this.resume() : this.pause();
+  }
+
+  pause() {
+    if (this.paused) return;
+    this.paused = true;
+    this.root.classList.add('is-paused');
+    this._syncPlayBtn();
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+      this._imageElapsed = Math.min(this.durationMs, Date.now() - this._imageStart);
+    }
+    const video = this.mediaEl.querySelector('video');
+    if (video) video.pause();
+    this._freezeRail();
+  }
+
+  resume() {
+    if (!this.paused) return;
+    this.paused = false;
+    this.root.classList.remove('is-paused');
+    this._syncPlayBtn();
+    const item = this.items[this.index];
+    const video = this.mediaEl.querySelector('video');
+    if (video) {
+      video.play().catch(() => {});
+      return;
+    }
+    if (item && item.type !== 'video') {
+      const remaining = Math.max(0, this.durationMs - this._imageElapsed);
+      this._imageStart = Date.now() - this._imageElapsed;
+      this.timer = setTimeout(() => this.next(), remaining);
+      this._resumeRail(remaining);
+    }
+  }
+
+  toggleMute() {
+    this.muted = !this.muted;
+    const video = this.mediaEl.querySelector('video');
+    if (video) video.muted = this.muted;
+    this._syncMuteBtn();
+  }
+
+  async toggleFullscreen() {
+    try {
+      if (!document.fullscreenElement) {
+        await this.root.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  _syncPlayBtn() {
+    const btn = document.getElementById('player-play');
+    if (!btn) return;
+    const pauseIcon = btn.querySelector('.icon-pause');
+    const playIcon = btn.querySelector('.icon-play');
+    if (pauseIcon) pauseIcon.hidden = this.paused;
+    if (playIcon) playIcon.hidden = !this.paused;
+    btn.setAttribute('aria-label', this.paused ? 'Play' : 'Pause');
+  }
+
+  _syncMuteBtn() {
+    const btn = document.getElementById('player-mute');
+    if (!btn) return;
+    const mutedIcon = btn.querySelector('.icon-muted');
+    const unmutedIcon = btn.querySelector('.icon-unmuted');
+    if (mutedIcon) mutedIcon.hidden = !this.muted;
+    if (unmutedIcon) unmutedIcon.hidden = this.muted;
+    btn.setAttribute('aria-label', this.muted ? 'Unmute' : 'Mute');
+    btn.hidden = !(this.items[this.index] && this.items[this.index].type === 'video');
+  }
+
   show(i) {
     if (!this.items.length) return;
     this.index = Math.max(0, Math.min(i, this.items.length - 1));
     const item = this.items[this.index];
 
-    if (this.timer) clearTimeout(this.timer);
-    if (this.videoCleanup) {
-      this.videoCleanup();
-      this.videoCleanup = null;
-    }
+    this.teardown();
+    this.paused = false;
+    this.root.classList.remove('is-paused');
+    this._imageElapsed = 0;
+    this._syncPlayBtn();
 
     this.renderRail();
     this.renderMeta(item);
     this.mediaEl.innerHTML = '';
+    this.mediaEl.classList.remove('is-video', 'is-image');
 
     if (item.type === 'video') {
+      this.mediaEl.classList.add('is-video');
       const video = document.createElement('video');
       video.className = 'player-video';
       video.src = item.url;
-      video.controls = true;
       video.playsInline = true;
-      video.muted = true; // autoplay policy
+      video.muted = this.muted;
       video.autoplay = true;
-      video.preload = 'metadata';
+      video.preload = 'auto';
+      video.setAttribute('playsinline', '');
       this.mediaEl.appendChild(video);
 
       const onEnded = () => this.next();
-      const onTime = () => this.updateVideoRail(video);
+      const onTime = () => {
+        this.updateVideoRail(video);
+        this._updateTime(video.currentTime, video.duration);
+      };
       video.addEventListener('ended', onEnded);
       video.addEventListener('timeupdate', onTime);
       video.addEventListener('loadedmetadata', onTime);
       video.play().catch(() => {
-        /* user gesture needed — controls remain */
+        this.paused = true;
+        this._syncPlayBtn();
       });
 
       this.videoCleanup = () => {
@@ -119,24 +253,41 @@ export class StoryPlayer {
         video.removeAttribute('src');
         video.load();
       };
+      this._syncMuteBtn();
     } else {
+      this.mediaEl.classList.add('is-image');
       const img = document.createElement('img');
       img.className = 'player-image';
       img.src = item.url;
       img.alt = item.caption || 'Story media';
       img.referrerPolicy = 'no-referrer';
+      img.draggable = false;
       this.mediaEl.appendChild(img);
 
+      this._imageStart = Date.now();
       this.timer = setTimeout(() => this.next(), this.durationMs);
       this.animateImageRail();
+      this._updateTime(0, this.durationMs / 1000);
+      this._syncMuteBtn();
     }
 
+    this.root.dataset.index = String(this.index);
     this.onIndexChange(this.index, this.items.length);
   }
 
+  _updateTime(current, duration) {
+    const el = document.getElementById('player-time');
+    if (!el) return;
+    if (!duration || !isFinite(duration)) {
+      el.textContent = fmtTime(current || 0);
+      return;
+    }
+    el.textContent = `${fmtTime(current)} / ${fmtTime(duration)}`;
+  }
+
   updateVideoRail(video) {
-    const segments = this.railEl.querySelectorAll('.rail-seg-fill');
-    const seg = segments[this.index];
+    if (this.paused) return;
+    const seg = this.railEl.querySelectorAll('.rail-seg-fill')[this.index];
     if (!seg) return;
     const d = video.duration;
     if (!d || !isFinite(d)) {
@@ -152,9 +303,27 @@ export class StoryPlayer {
     if (!seg) return;
     seg.style.transition = 'none';
     seg.style.transform = 'scaleX(0)';
-    // reflow
     void seg.offsetWidth;
-    seg.style.transition = `transform ${this.durationMs}ms linear`;
+    if (!this.paused) {
+      seg.style.transition = `transform ${this.durationMs}ms linear`;
+      seg.style.transform = 'scaleX(1)';
+    }
+  }
+
+  _freezeRail() {
+    const seg = this.railEl.querySelectorAll('.rail-seg-fill')[this.index];
+    if (!seg) return;
+    const computed = getComputedStyle(seg).transform;
+    seg.style.transition = 'none';
+    seg.style.transform = computed;
+  }
+
+  _resumeRail(remainingMs) {
+    const seg = this.railEl.querySelectorAll('.rail-seg-fill')[this.index];
+    if (!seg) return;
+    seg.style.transition = 'none';
+    void seg.offsetWidth;
+    seg.style.transition = `transform ${remainingMs}ms linear`;
     seg.style.transform = 'scaleX(1)';
   }
 
@@ -164,48 +333,42 @@ export class StoryPlayer {
       return;
     }
     this.railEl.innerHTML = this.items
-      .map(
-        (_, i) =>
-          `<div class="rail-seg" aria-hidden="true"><div class="rail-seg-fill" style="transform:scaleX(${i < this.index ? 1 : 0})"></div></div>`
-      )
+      .map((_, i) => {
+        const fill = i < this.index ? 1 : 0;
+        return `<div class="rail-seg"><div class="rail-seg-fill" style="transform:scaleX(${fill})"></div></div>`;
+      })
       .join('');
   }
 
   renderMeta(item) {
     const handle = item.username || '';
     const displayName = item.authorName || (handle ? `@${handle}` : '');
-    const platform = item.platform || item.source || '';
+    const platform = item.platform || '';
     const when = item.takenAt
       ? new Date(item.takenAt * (item.takenAt < 1e12 ? 1000 : 1)).toLocaleString()
       : '';
-    const cap = item.caption
-      ? `<p class="player-caption">${escapeText(item.caption)}</p>`
-      : '';
-
+    const cap = item.caption ? `<p class="player-caption">${escapeText(item.caption)}</p>` : '';
     const initial = (handle || displayName || '?').replace(/^@/, '').charAt(0).toUpperCase() || '?';
-    const avatar = handle
-      ? `<span class="player-avatar" aria-hidden="true">${escapeText(initial)}</span>`
-      : `<span class="player-avatar player-avatar-plain" aria-hidden="true"></span>`;
 
-    const authorBlock = displayName || handle
-      ? `<span class="player-author">
-           ${avatar}
-           <span class="player-author-text">
-             <span class="player-author-name">${escapeText(displayName || handle)}</span>
-             ${handle && displayName && displayName !== `@${handle}` ? `<span class="player-author-handle">@${escapeText(handle)}</span>` : ''}
-           </span>
-         </span>`
-      : `<span class="player-author">
-           <span class="player-avatar player-avatar-plain" aria-hidden="true"></span>
-           <span class="player-author-text"><span class="player-author-name">Unknown author</span></span>
-         </span>`;
+    const avatar = `<span class="player-avatar" aria-hidden="true">${escapeText(initial)}</span>`;
+    const name = displayName || handle || 'Unknown';
+    const handleLine =
+      handle && displayName && displayName !== `@${handle}`
+        ? `<span class="player-author-handle">@${escapeText(handle)}</span>`
+        : '';
 
     this.metaEl.innerHTML = `
       <div class="player-meta-row">
-        ${authorBlock}
+        <span class="player-author">
+          ${avatar}
+          <span class="player-author-text">
+            <span class="player-author-name">${escapeText(name)}</span>
+            ${handleLine}
+          </span>
+        </span>
         <span class="player-meta-side">
           ${platform ? `<span class="player-platform">${escapeText(platform)}</span>` : ''}
-          <span class="player-count">${this.index + 1} / ${this.items.length}</span>
+          <span class="player-count">${this.index + 1}/${this.items.length}</span>
         </span>
       </div>
       ${when ? `<div class="player-when">${escapeText(when)}</div>` : ''}
@@ -214,7 +377,7 @@ export class StoryPlayer {
   }
 
   renderEmpty() {
-    this.mediaEl.innerHTML = `<div class="player-empty">No segments to show</div>`;
+    this.mediaEl.innerHTML = `<div class="player-empty">No media to show</div>`;
     this.metaEl.innerHTML = '';
     this.railEl.innerHTML = '';
   }
@@ -228,6 +391,13 @@ export class StoryPlayer {
   }
 }
 
+function fmtTime(sec) {
+  const s = Math.max(0, Math.floor(sec || 0));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, '0')}`;
+}
+
 function escapeText(s) {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -236,10 +406,6 @@ function escapeText(s) {
     .replace(/"/g, '&quot;');
 }
 
-/**
- * Trigger a browser download. Works best when CDN sends CORS;
- * otherwise opens in a new tab so the browser save dialog can still help.
- */
 export async function downloadMedia(item) {
   if (!item || !item.url) return;
 
@@ -276,10 +442,9 @@ export async function downloadMedia(item) {
           return 'saved';
         }
       } catch {
-        /* proceed to open in tab */
+        /* open tab */
       }
     }
-    // fallback: open media so user can save manually
     window.open(item.url, '_blank', 'noopener,noreferrer');
     return 'opened';
   }
