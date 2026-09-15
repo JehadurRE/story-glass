@@ -244,9 +244,10 @@ export async function downloadMedia(item) {
   if (!item || !item.url) return;
 
   const filename = buildFilename(item);
+  const targetUrl = item.downloadUrl || item.url;
 
   try {
-    const res = await fetch(item.url, { mode: 'cors', credentials: 'omit' });
+    const res = await fetch(targetUrl, { mode: 'cors', credentials: 'omit' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const blob = await res.blob();
     const objectUrl = URL.createObjectURL(blob);
@@ -259,6 +260,25 @@ export async function downloadMedia(item) {
     setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
     return 'saved';
   } catch {
+    if (targetUrl !== item.url) {
+      try {
+        const res2 = await fetch(item.url, { mode: 'cors', credentials: 'omit' });
+        if (res2.ok) {
+          const blob2 = await res2.blob();
+          const objectUrl2 = URL.createObjectURL(blob2);
+          const a2 = document.createElement('a');
+          a2.href = objectUrl2;
+          a2.download = filename;
+          document.body.appendChild(a2);
+          a2.click();
+          a2.remove();
+          setTimeout(() => URL.revokeObjectURL(objectUrl2), 4000);
+          return 'saved';
+        }
+      } catch {
+        /* proceed to open in tab */
+      }
+    }
     // fallback: open media so user can save manually
     window.open(item.url, '_blank', 'noopener,noreferrer');
     return 'opened';

@@ -461,6 +461,203 @@ async function fetchIgStoryFeed(userId, cookie) {
   return { items: [], error: 'Story feed returned no items (no live stories or session blocked).', loginWall: false };
 }
 
+function parseSetCookie(res) {
+  const jar = {};
+  const list =
+    typeof res.headers?.getSetCookie === 'function'
+      ? res.headers.getSetCookie()
+      : (res.headers?.get?.('set-cookie') || '').split(/,\s*(?=[^;]+=[^;]+)/);
+  for (const c of list) {
+    if (!c) continue;
+    const [pair] = c.split(';');
+    const eq = pair.indexOf('=');
+    if (eq > 0) jar[pair.slice(0, eq).trim()] = pair.slice(eq + 1).trim();
+  }
+  return jar;
+}
+
+function decodeJwtPayload(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  const p = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+  const pad = p.length % 4 === 0 ? '' : '='.repeat(4 - (p.length % 4));
+  try {
+    if (typeof Buffer !== 'undefined') {
+      return JSON.parse(Buffer.from(p + pad, 'base64').toString('utf8'));
+    }
+    return JSON.parse(atob(p + pad));
+  } catch {
+    return null;
+  }
+}
+
+async function resolveViaBraveDown(parsed, originalUrl) {
+  let target = originalUrl;
+  if (parsed.username) {
+    target = `https://www.instagram.com/${parsed.username}/`;
+  }
+
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 12000);
+
+  try {
+    const pageRes = await fetch('https://bravedown.com/instagram-video-downloader', {
+      headers: {
+        'User-Agent': BROWSER_UA,
+        Accept: 'text/html',
+      },
+      signal: controller.signal,
+    });
+    if (!pageRes.ok) {
+      return { ok: false, error: `BraveDown initial page HTTP ${pageRes.status}` };
+    }
+    const html = await pageRes.text();
+    const cookies = parseSetCookie(pageRes);
+    const snapshots = [...html.matchAll(/wire:snapshot="([^"]+)"/g)]
+      .map((m) => {
+        try {
+          return JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#039;/g, "'"));
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    const csrf = (html.match(/data-csrf="([^"]+)"/) || [])[1];
+    const xsrf = decodeURIComponent(cookies['XSRF-TOKEN'] || '');
+    const child = snapshots.find((s) => s.memo?.name === 'public.tool.downloader-public');
+
+    if (!child || !csrf) {
+      return { ok: false, error: 'Could not extract BraveDown Livewire snapshot or CSRF token' };
+    }
+
+    const cookieHdr = Object.entries(cookies)
+      .map(([k, v]) => `${k}=${v}`)
+      .join('; ');
+
+    const res = await fetch('https://bravedown.com/livewire/update', {
+      method: 'POST',
+      headers: {
+        'User-Agent': BROWSER_UA,
+        Accept: 'text/html, application/xhtml+xml',
+        'Content-Type': 'application/json',
+        'X-Livewire': 'true',
+        'X-CSRF-TOKEN': csrf,
+        'X-XSRF-TOKEN': xsrf || csrf,
+        'X-Requested-With': 'XMLHttpRequest',
+        Origin: 'https://bravedown.com',
+        Referer: 'https://bravedown.com/instagram-video-downloader',
+        Cookie: cookieHdr,
+      },
+      body: JSON.stringify({
+        _token: csrf,
+        components: [
+          {
+            snapshot: JSON.stringify(child),
+            updates: { zlinkz: target },
+            calls: [{ path: '', method: 'onDownload', params: [] }],
+          },
+        ],
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      return { ok: false, error: `BraveDown update HTTP ${res.status}` };
+    }
+
+    const json = await res.json();
+    const snapJson = json.components?.[0]?.snapshot;
+    if (!snapJson) {
+      return { ok: false, error: 'No component snapshot returned from BraveDown' };
+    }
+
+    const snap = JSON.parse(snapJson);
+    const bd = snap.data;
+
+    if (!bd) {
+      return { ok: false, error: 'Empty BraveDown payload' };
+    }
+
+    if (bd.status === 'error') {
+      return { ok: false, error: bd.message || 'BraveDown returned error status' };
+    }
+
+    if (bd.status !== 'success' || !Array.isArray(bd.data)) {
+      return { ok: false, error: bd.message || 'BraveDown did not return items' };
+    }
+
+    const items = [];
+    const seenUrls = new Set();
+    const username = parsed.username || '';
+
+    for (const entry of bd.data) {
+      if (!entry || typeof entry !== 'object') continue;
+      const title = entry.title || '';
+      const entryUser = title.replace(/^IG Stories\s*-\s*/i, '').trim() || username;
+      const thumbnail = entry.thumbnail || null;
+
+      const linkObjects = [];
+      const walk = (node) => {
+        if (!node) return;
+        if (typeof node === 'object') {
+          if (node.url && typeof node.url === 'string') linkObjects.push(node);
+          if (Array.isArray(node)) node.forEach(walk);
+          else Object.values(node).forEach(walk);
+        }
+      };
+      walk(entry.links);
+
+      for (const link of linkObjects) {
+        const tokenMatch = link.url.match(/[?&]token=([^&]+)/);
+        const jwt = tokenMatch ? decodeJwtPayload(tokenMatch[1]) : null;
+        const mediaUrl = jwt?.url || link.url;
+        if (!mediaUrl || seenUrls.has(mediaUrl)) continue;
+        seenUrls.add(mediaUrl);
+
+        const isVideo =
+          link.type === 'video' ||
+          link.file === 'mp4' ||
+          jwt?.type === 'mp4' ||
+          /\.mp4(\?|$)/i.test(mediaUrl);
+
+        items.push({
+          type: isVideo ? 'video' : 'image',
+          url: mediaUrl,
+          downloadUrl: link.url,
+          thumbnail,
+          username: entryUser,
+          caption: title,
+          quality: link.quality || (isVideo ? '720p' : 'hd'),
+          id: hashId(mediaUrl),
+          source: 'bravedown-fallback',
+        });
+      }
+    }
+
+    if (!items.length) {
+      return { ok: false, error: 'No media items extracted from BraveDown response' };
+    }
+
+    return {
+      ok: true,
+      platform: 'instagram',
+      kind: parsed.kind || 'story',
+      items,
+      source: 'bravedown-fallback',
+      seenMark: false,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err.name === 'AbortError' ? 'BraveDown timeout (12s)' : err.message || String(err),
+    };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function resolveInstagram(parsed, originalUrl) {
   const cookie = igCookieHeader();
   const notes = [];
@@ -555,15 +752,34 @@ async function resolveInstagram(parsed, originalUrl) {
     }
   }
 
+  // --- BraveDown automated fallback (scrapes stories without visitor account) ---
+  try {
+    const bd = await resolveViaBraveDown(parsed, originalUrl);
+    if (bd.ok && bd.items?.length) {
+      return bd;
+    }
+    if (bd.error) {
+      notes.push(`BraveDown fallback: ${bd.error}`);
+    }
+  } catch (e) {
+    notes.push(`BraveDown fallback error: ${e.message || e}`);
+  }
+
+  const bdRateLimit = notes.some((n) => /limit of 10 free downloads|rate limit/i.test(n));
+
   return {
     ok: false,
     platform: 'instagram',
-    error: cookie
-      ? 'Instagram session did not return media (expired, challenged, or no live stories).'
-      : 'Instagram login wall — story APIs need a server session in 2026.',
-    hint: cookie
-      ? 'Open Vercel → Project → Settings → Environment Variables → update IG_SESSIONID from a fresh throwaway account cookie, then redeploy.'
-      : 'Set Vercel env IG_SESSIONID (cookie sessionid from a throwaway IG account). Facebook public videos work without it. Session may appear as a story viewer.',
+    error: bdRateLimit
+      ? 'Instagram requires login, and the fallback provider (BraveDown) reached its 10 free downloads / 2h limit.'
+      : cookie
+        ? 'Instagram session did not return media (expired, challenged, or no live stories).'
+        : 'Instagram login wall — story APIs need a server session in 2026.',
+    hint: bdRateLimit
+      ? 'Wait for the 2-hour fallback window to reset, or configure IG_SESSIONID in Vercel for dedicated unlimited access.'
+      : cookie
+        ? 'Open Vercel → Project → Settings → Environment Variables → update IG_SESSIONID from a fresh throwaway account cookie, then redeploy.'
+        : 'Set Vercel env IG_SESSIONID (cookie sessionid from a throwaway IG account). Facebook public videos work without it. Session may appear as a story viewer.',
     seenMark: false,
     details: notes,
   };
