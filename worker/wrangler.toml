@@ -1,0 +1,12 @@
+name = "storyglass-relay"
+main = "cors-relay.js"
+compatibility_date = "2024-11-01"
+
+# Optional: pin CORS to your StoryGlass site
+# [vars]
+# ALLOWED_ORIGINS = "https://yourdomain.com"
+
+# Instagram stories (optional): put a throwaway account sessionid cookie here
+# wrangler secret put IG_SESSIONID
+# Never commit the value.
+
