@@ -1,65 +1,76 @@
-# How Instagram story resolve works (and why BraveDown “just works”)
+# How Instagram / Facebook story resolve works (and why BraveDown “just works”)
 
 ## The real blocker
 
-In 2026 Instagram **does not** give story media to logged-out clients:
+In 2026 story media is **not** given to logged-out datacenter clients.
 
-| Call | Result (this datacenter) |
-|------|---------------------------|
-| `GET /api/v1/feed/user/{id}/story/` | `status:fail` “something went wrong” |
-| `GET /api/v1/users/web_profile_info/` | 401 `require_login` |
-| Profile HTML | ~625KB login-wall SPA, **0** media URLs |
-| GraphQL doc_ids | `execution error` / `require_login` |
-| oEmbed | HTML shell, not oEmbed JSON |
+### Instagram
 
-We re-tested this against BraveDown on `instagram.com/hail_afgani/`:
+| Call | Result |
+|------|--------|
+| `GET /api/v1/feed/user/{id}/story/` | fail without session |
+| Profile HTML | login-wall SPA, **0** media URLs |
 
-- **BraveDown:** success — filename `IG Stories - hаil_afgani`, real `fbcdn` jpg via their JWT CDN
-- **Us without session:** login wall
-- **Us with a real `sessionid`:** same API BraveDown uses (`feed/user/{id}/story/`)
+### Facebook page live story (`fpvanik`)
 
-So BraveDown is not magic. They hold a **logged-in Instagram session on their servers**, resolve `username → user_id`, then **GET** the story feed. That’s the same architecture we ship.
+| Call | Result |
+|------|--------|
+| Profile HTML `story_bucket` | **Works** — we can see a live story exists |
+| `GET /stories/{pageId}/{storyFbid}` | Empty shell (logged-out / datacenter) |
+| BraveDown | Real mp4s (`fb-story-profile-…`) |
+
+We re-tested BraveDown on `instagram.com/hail_afgani/` and `facebook.com/fpvanik`:
+
+- **BraveDown:** live story media via their server
+- **Us without session:** detect story, media blocked
+- **Us with a real cookie:** same story viewer path they use
 
 ## What StoryGlass implements
 
 ```
 Browser
-  └─ GET /api/resolve?url=https://instagram.com/<user>/
+  └─ GET /api/resolve?url=…
        └─ Vercel function
-            ├─ read env IG_SESSIONID (or IG_COOKIE)
-            ├─ GET instagram.com/<user>/  → extract user_id
-            ├─ GET i.instagram.com/api/v1/feed/user/{id}/story/   ← GET only
+            ├─ FB: profile HTML → story_bucket → story viewer (optional FB_COOKIE)
+            ├─ IG: username → user_id → feed/user/{id}/story/ (optional IG_SESSIONID)
             └─ return { items: [{ type, url, … }] }
 ```
 
-We **never** `POST /api/v1/media/seen/` (the explicit “mark viewed” call).  
-We **cannot** promise the session account is invisible — Instagram may still list it as a viewer.
+We **never** `POST` Instagram `media/seen/`.  
+We **cannot** promise a session is invisible — Meta may still list it as a viewer.
 
 ## Setup (once)
 
-1. Use a **throwaway** Instagram account (not your main).
-2. Log in in a browser → DevTools → Application → Cookies → `instagram.com` → copy **`sessionid`**.
-3. Vercel → Project → Settings → Environment Variables:
-   - Name: `IG_SESSIONID`
-   - Value: the raw sessionid (or a full cookie string containing `sessionid=…`)
-   - Environments: Production (+ Preview if you want)
-4. Redeploy (`git push` is enough if auto-deploy is on).
+### Instagram stories
+
+1. Throwaway IG account → browser DevTools → Cookies → `sessionid`
+2. Vercel env: `IG_SESSIONID`
+3. Redeploy
+
+### Facebook page live stories (same class as BraveDown)
+
+1. Throwaway Facebook account → log in at facebook.com
+2. DevTools → Application → Cookies → `facebook.com`
+3. Copy **`c_user`** and **`xs`** (or the full cookie string)
+4. Vercel env: **`FB_COOKIE`** = `c_user=…; xs=…;` (more cookies help)
+5. Redeploy
 
 Local:
 
 ```powershell
-$env:IG_SESSIONID = "<paste>"
+$env:IG_SESSIONID = "<ig sessionid>"
+$env:FB_COOKIE = "c_user=…; xs=…;"
 node scripts/local-relay.mjs
 ```
 
 ## If stories stop working
 
-Session expired or challenged. Rotate the cookie. Typical errors:
+Rotate cookies. Typical errors:
 
-- “Please wait a few minutes…” → rate limit / challenge  
-- “We're sorry, but something went wrong.” → dead session or no stories  
-- Empty items → account has no live stories right now  
+- IG “Please wait a few minutes…” → challenge / rate limit  
+- FB “still blocked the story player” → session expired or IP still challenged  
 
 ## Why not pure client-side?
 
-CORS + login wall. A static page cannot read Instagram story JSON. Commercial tools (BraveDown included) all use a server-held session. We are open about that.
+CORS + login wall. Commercial tools (BraveDown included) hold server sessions. We are open about that — you bring the session; we don’t scrape their backend.
+

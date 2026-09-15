@@ -274,7 +274,7 @@ async function resolveFacebook(parsed, originalUrl, options = {}) {
     // 1) Profile HTML often embeds story_bucket when a live story exists
     let liveStory = null;
     try {
-      const home = await fetchText(`https://www.facebook.com/${handle}`);
+      const home = await fetchFacebook(`https://www.facebook.com/${handle}`);
       pageMeta = pageMetaFromHtml(home.text);
       if (pageMeta.title) pageMeta = { ...pageMeta, handle };
       liveStory = parseStoryBucket(home.text);
@@ -295,7 +295,7 @@ async function resolveFacebook(parsed, originalUrl, options = {}) {
 
     for (const storyUrl of storyUrls) {
       try {
-        const res = await fetchText(storyUrl);
+        const res = await fetchFacebook(storyUrl);
         const items = extractMediaUrls(res.text);
         const storyMedia = items.filter(
           (i) =>
@@ -311,6 +311,7 @@ async function resolveFacebook(parsed, originalUrl, options = {}) {
             source: 'html-extract',
             viaUrl: storyUrl,
             page: pageMeta,
+            session: Boolean(fbCookieHeader()),
           };
         }
       } catch {
@@ -319,12 +320,17 @@ async function resolveFacebook(parsed, originalUrl, options = {}) {
     }
 
     if (liveStory) {
+      const hasFbSession = Boolean(fbCookieHeader());
       return {
         ok: false,
         platform: 'facebook',
         kind: 'story',
-        error: `${pageMeta?.title || 'This page'} has a live story, but Facebook blocked the story player for logged-out requests from this server.`,
-        hint: 'Open the story in the Facebook app/web, or paste a direct /watch/?v= video link. Page reels remain available as an optional extra.',
+        error: hasFbSession
+          ? `${pageMeta?.title || 'This page'} has a live story, but Facebook still blocked the story player (session expired or challenged).`
+          : `${pageMeta?.title || 'This page'} has a live story, but Facebook blocked the story player for logged-out requests.`,
+        hint: hasFbSession
+          ? 'Rotate FB_COOKIE in Vercel from a fresh throwaway Facebook login.'
+          : 'Set Vercel env FB_COOKIE (c_user + xs from a throwaway FB account) — same idea as BraveDown’s server session. Or paste a /watch/?v= link.',
         page: pageMeta,
         optional: 'library',
         hasLiveStory: true,
@@ -357,7 +363,7 @@ async function resolveFacebook(parsed, originalUrl, options = {}) {
 
   for (const url of candidates) {
     try {
-      const res = await fetchText(url);
+      const res = await fetchFacebook(url);
       if (!pageMeta) {
         const meta = pageMetaFromHtml(res.text);
         if (meta.title) pageMeta = { ...meta, handle };
@@ -469,6 +475,25 @@ function igCookieHeader() {
   if (raw.includes('=') && raw.includes('sessionid')) return raw;
   if (raw.includes(';')) return raw;
   return `sessionid=${raw}`;
+}
+
+/**
+ * Facebook cookies for the story viewer (c_user + xs, or full dump).
+ * Same class as BraveDown's server session — you supply your own throwaway login.
+ */
+function fbCookieHeader() {
+  const raw = (process.env.FB_COOKIE || process.env.FB_SESSION || '').trim();
+  if (!raw) return '';
+  if (raw.includes('c_user=') || raw.includes('xs=') || raw.includes(';')) return raw;
+  return '';
+}
+
+async function fetchFacebook(url, extra = {}) {
+  const cookie = fbCookieHeader();
+  return fetchText(url, {
+    ...(cookie ? { Cookie: cookie } : {}),
+    ...extra,
+  });
 }
 
 async function igUserIdFromProfile(username, cookie) {
