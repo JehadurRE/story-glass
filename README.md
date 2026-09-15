@@ -3,6 +3,10 @@
 Facebook & Instagram **story / video viewer**. Paste a public link → watch in the browser.  
 No visitor accounts. No app install.
 
+**Built for the viewer-list problem:** Instagram and Facebook put your name on every public story you open. Accidental taps, “just checking” looks, competitor research, quiet curiosity — all of it becomes a receipt. People get screenshotted, soft-blocked, or blocked after one open. StoryGlass is a browser tool for public links so you don’t have to open the official app (and hand over your identity) just to watch something that’s already public.
+
+Honest limits: Facebook public videos resolve without your account. Instagram stories often need a server session, and that session *can* appear as a viewer — we don’t market a fake “100% anonymous” guarantee.
+
 ## Product
 
 1. User pastes a Facebook or Instagram URL  

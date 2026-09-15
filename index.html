@@ -6,7 +6,7 @@
     <title>StoryGlass — Facebook &amp; Instagram Story Viewer</title>
     <meta
       name="description"
-      content="View public Facebook and Instagram stories in your browser. No account, no app. Paste a link and watch."
+      content="View public Facebook and Instagram stories without showing up in the viewer list. No account, no app. Paste a link and watch — avoid accidental story views and awkward blocks."
     />
     <meta name="theme-color" content="#fafafa" />
     <meta name="color-scheme" content="light" />
@@ -47,6 +47,7 @@
           <span class="brand-text">StoryGlass</span>
         </a>
         <nav class="header-nav" aria-label="Primary">
+          <a href="#why">Why</a>
           <a href="#how">How it works</a>
           <a href="#faq">FAQ</a>
           <a class="nav-cta" href="#lookup-form">View a story</a>
@@ -67,7 +68,8 @@
           </h1>
           <p class="lede">
             Paste a story, reel, or page video link. StoryGlass loads it in a clean story player —
-            phone or desktop, no account required.
+            phone or desktop, no account required. Built for people tired of showing up in the
+            viewer list after a “just curious” tap.
           </p>
           <div class="platform-row" aria-label="Supported platforms">
             <span class="chip chip-ig">
@@ -210,6 +212,50 @@
         </div>
       </section>
 
+      <section class="shell pain-section" id="why">
+        <div class="section-head">
+          <p class="eyebrow">Why this exists</p>
+          <h2>The story viewer list is awkward on purpose</h2>
+          <p class="section-sub">
+            Instagram and Facebook made watching public stories feel like signing a guest book.
+            One slip and your name is sitting in their viewer list — often at the worst time.
+          </p>
+        </div>
+        <div class="pain-grid">
+          <article class="pain-card">
+            <h3>“Why did they view my story?”</h3>
+            <p>
+              You opened a public story by accident, from a shared phone, or while half-asleep.
+              Twenty-four hours later it’s still a screenshot waiting to happen. Public shouldn’t
+              mean you’re on a list.
+            </p>
+          </article>
+          <article class="pain-card">
+            <h3>Stalking checks that aren’t stalking</h3>
+            <p>
+              Checking a competitor, an ex’s public brunch recap, or a page you’d rather not
+              “engage” with is normal curiosity. Platforms treat every open like a notification
+              you meant to send.
+            </p>
+          </article>
+          <article class="pain-card">
+            <h3>Blocks after one quiet look</h3>
+            <p>
+              People watch viewer lists like hawk. One view from a burner still looks suspicious
+              if it’s the only activity. Getting blocked for existing in a public story’s
+              analytics is the modern “seen zone.”
+            </p>
+          </article>
+          <article class="pain-card">
+            <h3>No “just looking” mode</h3>
+            <p>
+              Feed posts can be scrolled quietly. Stories can’t — the app is designed to surface
+              your identity back to the creator. That’s product choice, not a law of nature.
+            </p>
+          </article>
+        </div>
+      </section>
+
       <section class="shell info-grid">
         <article class="info-card" id="privacy">
           <h2>Good to know</h2>
@@ -218,22 +264,44 @@
             <li>No app install required</li>
             <li>Private or expired content usually won’t load</li>
             <li>Not a way around login walls or audience limits</li>
+            <li>Honest about Instagram: some resolve paths can still register a view</li>
           </ul>
         </article>
         <article class="info-card" id="faq">
           <h2>FAQ</h2>
           <dl class="faq">
             <div>
+              <dt>Will my name show up in their story viewer list?</dt>
+              <dd>
+                That’s the whole point people look for tools like this. When StoryGlass loads a
+                <strong>Facebook public video</strong> from page HTML, it does not use your Facebook
+                account — so you don’t appear as a viewer from yourself. Instagram is stricter:
+                story media often needs a server session, and <em>that</em> session (not your face,
+                but still an account) can show up. We don’t sell a magic “invisible” guarantee.
+              </dd>
+            </div>
+            <div>
               <dt>Do I need to sign up?</dt>
-              <dd>No. Paste a public link and watch.</dd>
+              <dd>No. Paste a public link and watch. No StoryGlass login, no Instagram login on your side.</dd>
             </div>
             <div>
               <dt>Which links work best?</dt>
               <dd>Facebook videos, page video tabs, Instagram story links with a media id.</dd>
             </div>
             <div>
-              <dt>Why did it fail?</dt>
-              <dd>Story may be private, deleted, or older than ~24 hours. Try the full share link again.</dd>
+              <dt>Why did it fail / why did I get blocked?</dt>
+              <dd>
+                Story may be private, deleted, or older than ~24 hours. If <em>you</em> viewed in
+                the official app and got blocked, that’s the platform’s viewer list doing its job —
+                a browser tool can’t un-send that view.
+              </dd>
+            </div>
+            <div>
+              <dt>Is this for stalking?</dt>
+              <dd>
+                No. It’s for watching content that’s already public without putting your name on a
+                guest list. Private accounts stay private. Don’t use it to harass anyone.
+              </dd>
             </div>
             <div>
               <dt>Mobile?</dt>
