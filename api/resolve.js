@@ -246,21 +246,40 @@ function parseStoryBucket(html) {
  * First-party story preview stills from profile JSON scripts that contain story_bucket.
  * Facebook prefetches these for the live story ring — logged-out HTML, CORS on CDN.
  */
+/**
+ * First-party current-story preview stills only.
+ * Must sit in the same JSON as story_bucket + prefer story CDN path (t39.30808-6)
+ * and prefetch_uris — not profile photos.
+ */
 function extractStoryPreviews(html) {
   const items = [];
   const seen = new Set();
   const scripts = [...String(html).matchAll(/<script[^>]*type="application\/json"[^>]*>([\s\S]*?)<\/script>/gi)];
+
   for (const s of scripts) {
     const body = s[1];
     if (!body.includes('story_bucket') && !body.includes('first_story_to_show')) continue;
     const n = normalizeHtml(body);
-    const urls = n.match(/https?:\/\/[^\s"'<>\\]+?\.(?:jpg|jpeg|webp|png)(?:\?[^\s"'<>\\]*)?/gi) || [];
+
+    // Only pull from prefetch blocks (story ring preload), not every image in the script
+    const prefetchBlocks = [...n.matchAll(/"prefetch_uris_v2":\[(.*?)\]/g)].map((m) => m[1]);
+    const pools = prefetchBlocks.length ? prefetchBlocks : [];
+
+    const urls = [];
+    for (const block of pools) {
+      for (const m of block.match(/https?:\/\/[^"\s]+/g) || []) urls.push(m);
+    }
+
     for (const raw of urls) {
-      const u = raw.replace(/[),.;\]}]+$/, '');
+      const u = raw.replace(/[),.;\]}]+$/, '').replace(/&amp;/g, '&');
       if (!/fbcdn|scontent/i.test(u)) continue;
+      if (!/\.(?:jpg|jpeg|webp|png)(\?|$)/i.test(u)) continue;
       if (/profile_pic|safe_image|emoji|rsrc\.php/i.test(u)) continue;
-      // prefer full-size story stills over tiny avatars
-      if (/s100x100|s148x148|s200x200|s320x320/i.test(u) && !/s960x960|s2048|mx2048/i.test(u)) continue;
+      // story stills use t39.30808-6; profile pics are usually t39.30808-1
+      const isStoryPath = /t39\.30808-6/i.test(u);
+      const isLarge = /s960x960|mx2048|s2048|ctp=s960/i.test(u);
+      if (!isStoryPath && !isLarge) continue;
+
       const key = u.split('?')[0];
       if (seen.has(key)) continue;
       seen.add(key);
@@ -269,12 +288,14 @@ function extractStoryPreviews(html) {
         url: u,
         id: hashId(u),
         source: 'story-preview',
+        score: (isStoryPath ? 2 : 0) + (isLarge ? 1 : 0),
       });
     }
   }
-  // largest-looking first
-  items.sort((a, b) => (b.url.includes('s960') || b.url.includes('mx2048') ? 1 : 0) - (a.url.includes('s960') || a.url.includes('mx2048') ? 1 : 0));
-  return items.slice(0, 8);
+
+  items.sort((a, b) => (b.score || 0) - (a.score || 0));
+  // current story only — 1–3 stills, not a feed
+  return items.slice(0, 3).map(({ score, ...rest }) => rest);
 }
 
 async function resolveFacebook(parsed, originalUrl, options = {}) {

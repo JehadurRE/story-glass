@@ -198,18 +198,27 @@ function extractStoryPreviews(html) {
     const body = s[1];
     if (!body.includes('story_bucket') && !body.includes('first_story_to_show')) continue;
     const n = normalizeHtml(body);
-    const urls = n.match(/https?:\/\/[^\s"'<>\\]+?\.(?:jpg|jpeg|webp|png)(?:\?[^\s"'<>\\]*)?/gi) || [];
+    const prefetchBlocks = [...n.matchAll(/"prefetch_uris_v2":\[(.*?)\]/g)].map((m) => m[1]);
+    const urls = [];
+    for (const block of prefetchBlocks) {
+      for (const m of block.match(/https?:\/\/[^"\s]+/g) || []) urls.push(m);
+    }
     for (const raw of urls) {
-      const u = raw.replace(/[),.;\]}]+$/, '');
+      const u = raw.replace(/[),.;\]}]+$/, '').replace(/&amp;/g, '&');
       if (!/fbcdn|scontent/i.test(u)) continue;
+      if (!/\.(?:jpg|jpeg|webp|png)(\?|$)/i.test(u)) continue;
       if (/profile_pic|safe_image|emoji|rsrc\.php/i.test(u)) continue;
+      const isStoryPath = /t39\.30808-6/i.test(u);
+      const isLarge = /s960x960|mx2048|s2048|ctp=s960/i.test(u);
+      if (!isStoryPath && !isLarge) continue;
       const key = u.split('?')[0];
       if (seen.has(key)) continue;
       seen.add(key);
-      items.push({ type: 'image', url: u, source: 'story-preview' });
+      items.push({ type: 'image', url: u, source: 'story-preview', score: (isStoryPath ? 2 : 0) + (isLarge ? 1 : 0) });
     }
   }
-  return items.slice(0, 8);
+  items.sort((a, b) => (b.score || 0) - (a.score || 0));
+  return items.slice(0, 3);
 }
 
 async function resolveFacebook(parsed, originalUrl, opts = {}) {
