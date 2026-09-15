@@ -169,8 +169,10 @@ async function fetchText(url, headers = {}) {
   return { status: res.status, text: await res.text() };
 }
 
-async function resolveFacebook(parsed, originalUrl) {
+async function resolveFacebook(parsed, originalUrl, opts = {}) {
+  const includeLibrary = Boolean(opts.includeLibrary);
   const candidates = [];
+
   if (parsed.kind === 'video' && parsed.mediaId) {
     candidates.push(`https://www.facebook.com/watch/?v=${parsed.mediaId}`);
     if (originalUrl.includes('/videos/')) candidates.push(originalUrl);
@@ -178,44 +180,81 @@ async function resolveFacebook(parsed, originalUrl) {
   }
   if (parsed.kind === 'profile' && parsed.username) {
     const h = parsed.username;
-    // reels often hold progressive mp4s; /videos may only be thumbnails
-    candidates.push(`https://www.facebook.com/${h}/reels`);
-    candidates.push(`https://www.facebook.com/${h}/videos`);
-    candidates.push(`https://www.facebook.com/${h}`);
+    if (includeLibrary) {
+      candidates.push(`https://www.facebook.com/${h}/reels`);
+      candidates.push(`https://www.facebook.com/${h}/videos`);
+    } else {
+      candidates.push(`https://www.facebook.com/stories/${h}`);
+    }
   }
   if (!candidates.length) candidates.push(originalUrl);
 
   let imageFallback = null;
+  let pageMeta = null;
   for (const url of candidates) {
     try {
       const res = await fetchText(url);
+      if (!pageMeta) {
+        const m = res.text.match(/property="og:title"\s+content="([^"]+)"/);
+        if (m) pageMeta = { title: m[1].replace(/&amp;/g, '&'), handle: parsed.username || '' };
+      }
       const items = extractMediaUrls(res.text);
       const videos = items.filter((i) => i.type === 'video' || i.url.includes('.mp4'));
       if (videos.length) {
         return {
           ok: true,
           platform: 'facebook',
-          items: videos.slice(0, 20).map((i) => ({ ...i, source: 'facebook-html' })),
+          items: videos.slice(0, includeLibrary ? 20 : 8).map((i) => ({ ...i, source: 'facebook-html' })),
           source: 'html-extract',
           viaUrl: url,
+          page: pageMeta,
         };
+      }
+      if (!includeLibrary && parsed.kind === 'profile') {
+        const storyImgs = items.filter(
+          (i) => i.type === 'image' && !/profile_pic|safe_image|rsrc\.php/i.test(i.url)
+        );
+        if (storyImgs.length && storyImgs.length <= 8) {
+          return {
+            ok: true,
+            platform: 'facebook',
+            items: storyImgs.slice(0, 8).map((i) => ({ ...i, source: 'facebook-story' })),
+            source: 'html-extract',
+            viaUrl: url,
+            page: pageMeta,
+          };
+        }
       }
       if (!imageFallback && items.length) imageFallback = { items, viaUrl: url };
     } catch {
       /* next */
     }
   }
-  if (imageFallback) {
+
+  if (!includeLibrary && parsed.kind === 'profile') {
+    return {
+      ok: false,
+      platform: 'facebook',
+      error: pageMeta?.title
+        ? `No current story on ${pageMeta.title} right now.`
+        : 'No current story found for this page.',
+      hint: 'Paste a story/video link, or load page reels as optional.',
+      page: pageMeta,
+      optional: 'library',
+    };
+  }
+
+  if (imageFallback && includeLibrary) {
     return {
       ok: true,
       platform: 'facebook',
       items: imageFallback.items.slice(0, 16).map((i) => ({ ...i, source: 'facebook-html' })),
       source: 'html-extract',
       viaUrl: imageFallback.viaUrl,
-      hint: 'Photos only — no progressive videos in public HTML.',
+      page: pageMeta,
     };
   }
-  return { ok: false, platform: 'facebook', error: 'No Facebook media extracted' };
+  return { ok: false, platform: 'facebook', error: 'No Facebook media extracted', page: pageMeta };
 }
 
 function parseSetCookie(res) {
@@ -484,10 +523,11 @@ async function resolveInstagram(parsed, originalUrl) {
   };
 }
 
-async function handleResolve(url) {
+async function handleResolve(url, mode) {
   if (!url || !isAllowedTarget(url)) return { ok: false, error: 'Blocked or missing url' };
   const parsed = parseTarget(url);
-  if (parsed.platform === 'facebook') return resolveFacebook(parsed, url);
+  const includeLibrary = mode === 'library';
+  if (parsed.platform === 'facebook') return resolveFacebook(parsed, url, { includeLibrary });
   if (parsed.platform === 'instagram') return resolveInstagram(parsed, url);
   return { ok: false, error: 'Unrecognized URL' };
 }
@@ -515,7 +555,7 @@ http
       return;
     }
     if (u.pathname === '/api/resolve' || u.pathname === '/resolve') {
-      const result = await handleResolve(u.searchParams.get('url'));
+      const result = await handleResolve(u.searchParams.get('url'), u.searchParams.get('mode'));
       res.end(JSON.stringify(result));
       return;
     }

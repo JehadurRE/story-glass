@@ -182,13 +182,14 @@ export function loadSettings() {
  * Resolve via the app's own API (same origin). Optional extra base URL via
  * localStorage key sg.relay is only for local/dev — never shown in the product UI.
  */
-export async function resolveViaRelay(targetUrl) {
+export async function resolveViaRelay(targetUrl, opts = {}) {
+  const extra = opts.includeLibrary ? '&mode=library' : '';
   const endpoints = [];
 
   if (typeof location !== 'undefined' && location.origin && location.protocol.startsWith('http')) {
     endpoints.push({
       id: 'app',
-      url: `${location.origin}/api/resolve?url=${encodeURIComponent(targetUrl)}`,
+      url: `${location.origin}/api/resolve?url=${encodeURIComponent(targetUrl)}${extra}`,
     });
   }
 
@@ -197,7 +198,7 @@ export async function resolveViaRelay(targetUrl) {
     const base = relay.replace(/\/$/, '');
     endpoints.push({
       id: 'relay',
-      url: `${base}/api/resolve?url=${encodeURIComponent(targetUrl)}`,
+      url: `${base}/api/resolve?url=${encodeURIComponent(targetUrl)}${extra}`,
     });
   }
 
@@ -207,6 +208,8 @@ export async function resolveViaRelay(targetUrl) {
 
   let lastError = 'Could not resolve this link.';
   let lastHint = '';
+  let lastPage = null;
+  let lastOptional = null;
 
   for (const endpoint of endpoints) {
     try {
@@ -230,10 +233,13 @@ export async function resolveViaRelay(targetUrl) {
           items: json.items,
           source: json.source || endpoint.id,
           page: json.page || null,
+          optional: json.optional || null,
         };
       }
       lastError = (json && json.error) || 'Could not load media for this link.';
       lastHint = (json && json.hint) || 'Try a Facebook public video link, or paste page source under “Having trouble?”.';
+      lastPage = json && json.page ? json.page : lastPage;
+      lastOptional = json && json.optional ? json.optional : lastOptional;
     } catch (e) {
       const msg = e && e.name === 'AbortError' ? 'Request timed out' : (e && e.message) || 'Network error';
       lastError = msg;
@@ -241,7 +247,14 @@ export async function resolveViaRelay(targetUrl) {
     }
   }
 
-  return { ok: false, via: endpoints[0]?.id || 'none', error: lastError, hint: lastHint };
+  return {
+    ok: false,
+    via: endpoints[0]?.id || 'none',
+    error: lastError,
+    hint: lastHint,
+    page: lastPage,
+    optional: lastOptional,
+  };
 }
 
 /**

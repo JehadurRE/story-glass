@@ -68,14 +68,25 @@ function showResult(show) {
   els.result.hidden = !show;
 }
 
-function showError(message, hint) {
+function showError(message, hint, optional) {
   els.errorBox.hidden = !message;
   if (message) {
+    const optionalBtn =
+      optional === 'library'
+        ? `<button type="button" class="btn-ghost btn-sm" id="load-library-btn" style="margin-top:0.75rem">Load page videos (optional)</button>`
+        : '';
     els.errorBox.innerHTML = `
       <div class="error-title">Could not load story</div>
       <div class="error-body">${escapeHtml(message)}</div>
       ${hint ? `<div class="error-hint">${escapeHtml(hint)}</div>` : ''}
+      ${optionalBtn}
     `;
+    const libBtn = document.getElementById('load-library-btn');
+    if (libBtn) {
+      libBtn.addEventListener('click', () => {
+        runLookup(els.input.value, { includeLibrary: true });
+      });
+    }
   } else {
     els.errorBox.innerHTML = '';
   }
@@ -126,7 +137,7 @@ function applyItems(items, meta = {}) {
   updateActionButtons();
 }
 
-async function runLookup(raw) {
+async function runLookup(raw, opts = {}) {
   if (busy) return;
   showError('');
   const parsed = parseUrl(raw);
@@ -143,7 +154,7 @@ async function runLookup(raw) {
   setPlatformBadge(parsed.platform, parsed.kind);
   showResult(true);
   els.player.hidden = true;
-  setStatus('Loading story…', 'busy');
+  setStatus(opts.includeLibrary ? 'Loading page videos…' : 'Loading story…', 'busy');
   setBusy(true);
 
   try {
@@ -151,13 +162,13 @@ async function runLookup(raw) {
     if (parsed.platform === PLATFORMS.INSTAGRAM) {
       outcome = await resolveInstagram(parsed);
     } else {
-      outcome = await resolveFacebook(parsed);
+      outcome = await resolveFacebook(parsed, opts);
     }
 
     if (!outcome.ok) {
       setStatus('');
       els.player.hidden = true;
-      showError(outcome.error || 'Unknown error', outcome.hint);
+      showError(outcome.error || 'Unknown error', outcome.hint, outcome.optional);
       lastItems = [];
       updateActionButtons();
       return;
@@ -174,9 +185,14 @@ async function runLookup(raw) {
             ? 'Facebook'
             : '',
     };
+    const n = outcome.items.length;
     applyItems(outcome.items, {
       author,
-      hint: outcome.items.length === 1 ? '1 segment' : `${outcome.items.length} segments`,
+      hint: opts.includeLibrary
+        ? `Optional library · ${n} video${n === 1 ? '' : 's'}`
+        : n === 1
+          ? 'Current story · 1 segment'
+          : `Current story · ${n} segments`,
     });
   } finally {
     setBusy(false);

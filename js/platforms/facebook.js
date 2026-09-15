@@ -5,22 +5,33 @@ import { extractMediaFromHtml, detectPayloadKind, extractMediaFromIgInfo } from 
  * Resolve Facebook story / reel / video links.
  * Order: Worker relay → proxy HTML extract → direct page fetch.
  */
-export async function resolveFacebook(parsed) {
+export async function resolveFacebook(parsed, opts = {}) {
   const target = parsed.normalized || parsed.original;
 
-  // 1) Worker /api/resolve — proven path for public watch/videos links
-  const viaRelay = await resolveViaRelay(target);
+  const viaRelay = await resolveViaRelay(target, opts);
   if (viaRelay.ok && viaRelay.items?.length) {
     return {
       ok: true,
       items: viaRelay.items,
       via: `relay:${viaRelay.source || 'resolve'}`,
       page: viaRelay.page || null,
+      optional: viaRelay.optional || null,
     };
   }
 
-  // 2) Client-side HTML mine through public CORS proxies
-  const probeUrls = buildCandidateUrls(parsed);
+  // Story-only for profiles: do not dump reels unless opted in
+  if (parsed.kind === 'profile' && !opts.includeLibrary) {
+    return {
+      ok: false,
+      items: [],
+      error: viaRelay.error || 'No current story found for this page.',
+      hint: viaRelay.hint || 'Paste a story or video link, or load page reels as an optional extra.',
+      page: viaRelay.page || null,
+      optional: 'library',
+    };
+  }
+
+  const probeUrls = buildCandidateUrls(parsed, opts);
   for (const pageUrl of probeUrls) {
     const viaProxy = await resolveFacebookViaProxies(pageUrl);
     if (viaProxy.ok && viaProxy.items?.length) {
@@ -98,7 +109,7 @@ export async function resolveFacebook(parsed) {
   };
 }
 
-function buildCandidateUrls(parsed) {
+function buildCandidateUrls(parsed, opts = {}) {
   const { kind, mediaId, pageId, storyFbid, username, normalized, original } = parsed;
   const candidates = [];
 
@@ -118,10 +129,12 @@ function buildCandidateUrls(parsed) {
       candidates.push(`https://www.facebook.com/story.php?story_fbid=${encodeURIComponent(mediaId)}`);
     }
   }
-  if (kind === 'profile' && username) {
+  if (kind === 'profile' && username && opts.includeLibrary) {
     candidates.push(`https://www.facebook.com/${username}/reels`);
     candidates.push(`https://www.facebook.com/${username}/videos`);
-    candidates.push(`https://www.facebook.com/${username}`);
+  }
+  if (kind === 'profile' && username && !opts.includeLibrary) {
+    candidates.push(`https://www.facebook.com/stories/${username}`);
   }
   if (!candidates.length && (normalized || original)) candidates.push(normalized || original);
   return candidates;

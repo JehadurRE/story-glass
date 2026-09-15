@@ -219,9 +219,12 @@ function pageMetaFromHtml(html) {
   };
 }
 
-async function resolveFacebook(parsed, originalUrl) {
+async function resolveFacebook(parsed, originalUrl, options = {}) {
+  const includeLibrary = Boolean(options.includeLibrary);
   const candidates = [];
+  let pageMeta = null;
 
+  // Specific video / reel / story link → that media only
   if (parsed.kind === 'video' && parsed.mediaId) {
     candidates.push(`https://www.facebook.com/watch/?v=${parsed.mediaId}`);
     if (originalUrl.includes('/videos/')) candidates.push(originalUrl);
@@ -240,18 +243,68 @@ async function resolveFacebook(parsed, originalUrl) {
     }
   }
 
-  // Page / profile: try videos + reels; prefer actual mp4s over thumbnails
   const handle = pageHandleFromUrl(originalUrl);
-  if (handle) {
+
+  // Page profile, default: current story only (not a reels dump)
+  if (handle && parsed.kind === 'profile' && !includeLibrary) {
+    const storyUrl = `https://www.facebook.com/stories/${handle}`;
+    try {
+      const res = await fetchText(storyUrl);
+      pageMeta = pageMetaFromHtml(res.text);
+      if (pageMeta.title) pageMeta = { ...pageMeta, handle };
+      const items = extractMediaUrls(res.text);
+      const storyMedia = items.filter(
+        (i) =>
+          (i.type === 'video' || i.url.includes('.mp4') || i.type === 'image') &&
+          !/profile_pic|safe_image|emoji|rsrc\.php/i.test(i.url)
+      );
+      // A live story viewer typically has a small number of items
+      if (storyMedia.length && storyMedia.length <= 8) {
+        return {
+          ok: true,
+          platform: 'facebook',
+          kind: 'story',
+          items: storyMedia.slice(0, 8).map((i) => ({ ...i, source: 'facebook-story' })),
+          source: 'html-extract',
+          viaUrl: storyUrl,
+          page: pageMeta,
+        };
+      }
+    } catch {
+      /* fall through to no-story */
+    }
+
+    // page cover for author identity
+    try {
+      const home = await fetchText(`https://www.facebook.com/${handle}`);
+      const meta = pageMetaFromHtml(home.text);
+      if (meta.title) pageMeta = { ...meta, handle };
+    } catch {
+      /* ignore */
+    }
+
+    return {
+      ok: false,
+      platform: 'facebook',
+      kind: 'story',
+      error: pageMeta?.title
+        ? `No current story on ${pageMeta.title} right now.`
+        : 'No current story found for this page.',
+      hint: 'Paste a specific story or video link — or load page reels as an optional extra.',
+      page: pageMeta,
+      optional: 'library',
+    };
+  }
+
+  // Optional library mode (user opted in)
+  if (handle && includeLibrary) {
     candidates.push(`https://www.facebook.com/${handle}/reels`);
     candidates.push(`https://www.facebook.com/${handle}/videos`);
-    candidates.push(`https://www.facebook.com/${handle}`);
   }
 
   if (!candidates.length) candidates.push(originalUrl);
 
   const errors = [];
-  let pageMeta = null;
   let imageFallback = null;
 
   for (const url of candidates) {
@@ -267,65 +320,43 @@ async function resolveFacebook(parsed, originalUrl) {
         return {
           ok: true,
           platform: 'facebook',
-          kind: parsed.kind === 'profile' || !parsed.kind ? 'page' : parsed.kind,
-          items: videos.slice(0, 20).map((i) => ({ ...i, source: 'facebook-html' })),
+          kind: parsed.kind === 'profile' ? 'library' : parsed.kind,
+          items: videos.slice(0, includeLibrary ? 20 : 4).map((i) => ({ ...i, source: 'facebook-html' })),
           source: 'html-extract',
           viaUrl: url,
           page: pageMeta,
         };
       }
       if (!imageFallback && items.length) {
-        imageFallback = {
-          items: items.slice(0, 16).map((i) => ({ ...i, source: 'facebook-html' })),
-          viaUrl: url,
-        };
+        imageFallback = { items: items.slice(0, 8), viaUrl: url };
       }
-      errors.push(`${url} → HTTP ${res.status}, no mp4`);
+      errors.push(`${url} → no mp4`);
     } catch (e) {
       errors.push(`${url} → ${e && e.message ? e.message : e}`);
     }
   }
 
-  if (imageFallback) {
+  if (imageFallback && includeLibrary) {
     return {
       ok: true,
       platform: 'facebook',
-      kind: 'page',
-      items: imageFallback.items,
+      kind: 'library',
+      items: imageFallback.items.map((i) => ({ ...i, source: 'facebook-html' })),
       source: 'html-extract',
       viaUrl: imageFallback.viaUrl,
       page: pageMeta,
-      hint: 'Photos only — this page’s public HTML had no progressive videos.',
-    };
-  }
-
-  if (pageMeta && pageMeta.image) {
-    return {
-      ok: true,
-      platform: 'facebook',
-      kind: 'page',
-      items: [
-        {
-          type: 'image',
-          url: pageMeta.image,
-          id: hashId(pageMeta.image),
-          username: handle || '',
-          caption: pageMeta.title || '',
-          source: 'page-cover',
-        },
-      ],
-      source: 'page-meta',
-      page: pageMeta,
-      hint: 'Showing page cover. For videos, paste a specific /watch/?v= or /videos/ link.',
+      hint: 'Photos only — no progressive videos in public HTML.',
     };
   }
 
   return {
     ok: false,
     platform: 'facebook',
-    error: 'Could not extract Facebook media from page HTML.',
-    hint: 'Public watch/?v=, /videos/, and page /videos tabs work best with a direct media link.',
+    error: 'Could not extract Facebook media.',
+    hint: 'Use a story link, /watch/?v=, or page reels (optional).',
     details: errors,
+    optional: handle ? 'library' : undefined,
+    page: pageMeta,
   };
 }
 
@@ -824,9 +855,13 @@ export default async function handler(req, res) {
 
   try {
     const parsed = parseTarget(target);
+    const includeLibrary =
+      req.query.mode === 'library' ||
+      req.query.include === 'videos' ||
+      req.query.include === 'library';
     const result =
       parsed.platform === 'facebook'
-        ? await resolveFacebook(parsed, target)
+        ? await resolveFacebook(parsed, target, { includeLibrary })
         : parsed.platform === 'instagram'
           ? await resolveInstagram(parsed, target)
           : { ok: false, error: 'Unrecognized URL' };
