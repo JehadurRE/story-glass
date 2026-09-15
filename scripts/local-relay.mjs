@@ -169,9 +169,32 @@ async function fetchText(url, headers = {}) {
   return { status: res.status, text: await res.text() };
 }
 
+function parseStoryBucket(html) {
+  const n = normalizeHtml(html);
+  const idx = n.indexOf('"story_bucket"');
+  if (idx < 0) return null;
+  const slice = n.slice(idx, idx + 2500);
+  const pageId = (slice.match(/"id":"(\d{8,})","first_story_to_show"/) || [])[1];
+  const firstRaw = (slice.match(/"first_story_to_show":\{"id":"([^"]+)"/) || [])[1];
+  let storyFbid = null;
+  if (firstRaw) {
+    try {
+      const decoded = Buffer.from(firstRaw, 'base64').toString('utf8');
+      const m = decoded.match(/(\d{8,})/);
+      if (m) storyFbid = m[1];
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!pageId && !storyFbid) return null;
+  return { pageId, storyFbid };
+}
+
 async function resolveFacebook(parsed, originalUrl, opts = {}) {
   const includeLibrary = Boolean(opts.includeLibrary);
   const candidates = [];
+  let pageMeta = null;
+  let hasLiveStory = false;
 
   if (parsed.kind === 'video' && parsed.mediaId) {
     candidates.push(`https://www.facebook.com/watch/?v=${parsed.mediaId}`);
@@ -184,13 +207,31 @@ async function resolveFacebook(parsed, originalUrl, opts = {}) {
       candidates.push(`https://www.facebook.com/${h}/reels`);
       candidates.push(`https://www.facebook.com/${h}/videos`);
     } else {
+      // detect live story_bucket on profile, then try story viewer
+      let live = null;
+      try {
+        const home = await fetchText(`https://www.facebook.com/${h}`);
+        const title = (home.text.match(/property="og:title"\s+content="([^"]+)"/) || [])[1];
+        pageMeta = { title: title?.replace(/&amp;/g, '&') || '', handle: h };
+        live = parseStoryBucket(home.text);
+      } catch {
+        /* ignore */
+      }
+      if (live?.pageId && live?.storyFbid) {
+        candidates.push(`https://www.facebook.com/stories/${live.pageId}/${live.storyFbid}`);
+        candidates.push(
+          `https://www.facebook.com/story.php?story_fbid=${live.storyFbid}&id=${live.pageId}`
+        );
+      } else if (live?.pageId) {
+        candidates.push(`https://www.facebook.com/stories/${live.pageId}`);
+      }
       candidates.push(`https://www.facebook.com/stories/${h}`);
+      if (live) hasLiveStory = true;
     }
   }
   if (!candidates.length) candidates.push(originalUrl);
 
   let imageFallback = null;
-  let pageMeta = null;
   for (const url of candidates) {
     try {
       const res = await fetchText(url);
@@ -235,12 +276,17 @@ async function resolveFacebook(parsed, originalUrl, opts = {}) {
     return {
       ok: false,
       platform: 'facebook',
-      error: pageMeta?.title
-        ? `No current story on ${pageMeta.title} right now.`
-        : 'No current story found for this page.',
-      hint: 'Paste a story/video link, or load page reels as optional.',
+      error: hasLiveStory
+        ? `${pageMeta?.title || 'This page'} has a live story, but Facebook blocked the story player for logged-out requests.`
+        : pageMeta?.title
+          ? `No current story on ${pageMeta.title} right now.`
+          : 'No current story found for this page.',
+      hint: hasLiveStory
+        ? 'Open the story in Facebook, or paste a /watch/?v= link. Reels are optional.'
+        : 'Paste a story/video link, or load page reels as optional.',
       page: pageMeta,
       optional: 'library',
+      hasLiveStory,
     };
   }
 

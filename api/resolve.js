@@ -219,6 +219,30 @@ function pageMetaFromHtml(html) {
   };
 }
 
+function parseStoryBucket(html) {
+  const n = normalizeHtml(html);
+  const idx = n.indexOf('"story_bucket"');
+  if (idx < 0) return null;
+  const slice = n.slice(idx, idx + 2500);
+  const pageId = (slice.match(/"story_bucket":\{"nodes":\[\{"[^"]*":(?:true|false),"id":"(\d+)"/) ||
+    slice.match(/"id":"(\d{8,})","first_story_to_show"/) ||
+    [])[1];
+  const firstRaw = (slice.match(/"first_story_to_show":\{"id":"([^"]+)"/) || [])[1];
+  let storyFbid = null;
+  if (firstRaw) {
+    try {
+      const decoded = atob(firstRaw);
+      // e.g. S:_ISC:1391279903214514
+      const m = decoded.match(/(\d{8,})/);
+      if (m) storyFbid = m[1];
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!pageId && !storyFbid) return null;
+  return { pageId, storyFbid };
+}
+
 async function resolveFacebook(parsed, originalUrl, options = {}) {
   const includeLibrary = Boolean(options.includeLibrary);
   const candidates = [];
@@ -247,40 +271,64 @@ async function resolveFacebook(parsed, originalUrl, options = {}) {
 
   // Page profile, default: current story only (not a reels dump)
   if (handle && parsed.kind === 'profile' && !includeLibrary) {
-    const storyUrl = `https://www.facebook.com/stories/${handle}`;
-    try {
-      const res = await fetchText(storyUrl);
-      pageMeta = pageMetaFromHtml(res.text);
-      if (pageMeta.title) pageMeta = { ...pageMeta, handle };
-      const items = extractMediaUrls(res.text);
-      const storyMedia = items.filter(
-        (i) =>
-          (i.type === 'video' || i.url.includes('.mp4') || i.type === 'image') &&
-          !/profile_pic|safe_image|emoji|rsrc\.php/i.test(i.url)
-      );
-      // A live story viewer typically has a small number of items
-      if (storyMedia.length && storyMedia.length <= 8) {
-        return {
-          ok: true,
-          platform: 'facebook',
-          kind: 'story',
-          items: storyMedia.slice(0, 8).map((i) => ({ ...i, source: 'facebook-story' })),
-          source: 'html-extract',
-          viaUrl: storyUrl,
-          page: pageMeta,
-        };
-      }
-    } catch {
-      /* fall through to no-story */
-    }
-
-    // page cover for author identity
+    // 1) Profile HTML often embeds story_bucket when a live story exists
+    let liveStory = null;
     try {
       const home = await fetchText(`https://www.facebook.com/${handle}`);
-      const meta = pageMetaFromHtml(home.text);
-      if (meta.title) pageMeta = { ...meta, handle };
+      pageMeta = pageMetaFromHtml(home.text);
+      if (pageMeta.title) pageMeta = { ...pageMeta, handle };
+      liveStory = parseStoryBucket(home.text);
     } catch {
       /* ignore */
+    }
+
+    const storyUrls = [];
+    if (liveStory?.pageId && liveStory?.storyFbid) {
+      storyUrls.push(`https://www.facebook.com/stories/${liveStory.pageId}/${liveStory.storyFbid}`);
+      storyUrls.push(
+        `https://www.facebook.com/story.php?story_fbid=${liveStory.storyFbid}&id=${liveStory.pageId}`
+      );
+    } else if (liveStory?.pageId) {
+      storyUrls.push(`https://www.facebook.com/stories/${liveStory.pageId}`);
+    }
+    storyUrls.push(`https://www.facebook.com/stories/${handle}`);
+
+    for (const storyUrl of storyUrls) {
+      try {
+        const res = await fetchText(storyUrl);
+        const items = extractMediaUrls(res.text);
+        const storyMedia = items.filter(
+          (i) =>
+            (i.type === 'video' || i.url.includes('.mp4') || i.type === 'image') &&
+            !/profile_pic|safe_image|emoji|rsrc\.php/i.test(i.url)
+        );
+        if (storyMedia.length && storyMedia.length <= 12) {
+          return {
+            ok: true,
+            platform: 'facebook',
+            kind: 'story',
+            items: storyMedia.slice(0, 12).map((i) => ({ ...i, source: 'facebook-story' })),
+            source: 'html-extract',
+            viaUrl: storyUrl,
+            page: pageMeta,
+          };
+        }
+      } catch {
+        /* next */
+      }
+    }
+
+    if (liveStory) {
+      return {
+        ok: false,
+        platform: 'facebook',
+        kind: 'story',
+        error: `${pageMeta?.title || 'This page'} has a live story, but Facebook blocked the story player for logged-out requests from this server.`,
+        hint: 'Open the story in the Facebook app/web, or paste a direct /watch/?v= video link. Page reels remain available as an optional extra.',
+        page: pageMeta,
+        optional: 'library',
+        hasLiveStory: true,
+      };
     }
 
     return {
