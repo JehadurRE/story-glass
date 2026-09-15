@@ -172,17 +172,41 @@ export class StoryPlayer {
   }
 
   renderMeta(item) {
-    const user = item.username ? `@${item.username}` : item.source || 'media';
+    const handle = item.username || '';
+    const displayName = item.authorName || (handle ? `@${handle}` : '');
+    const platform = item.platform || item.source || '';
     const when = item.takenAt
       ? new Date(item.takenAt * (item.takenAt < 1e12 ? 1000 : 1)).toLocaleString()
       : '';
     const cap = item.caption
       ? `<p class="player-caption">${escapeText(item.caption)}</p>`
       : '';
+
+    const initial = (handle || displayName || '?').replace(/^@/, '').charAt(0).toUpperCase() || '?';
+    const avatar = handle
+      ? `<span class="player-avatar" aria-hidden="true">${escapeText(initial)}</span>`
+      : `<span class="player-avatar player-avatar-plain" aria-hidden="true"></span>`;
+
+    const authorBlock = displayName || handle
+      ? `<span class="player-author">
+           ${avatar}
+           <span class="player-author-text">
+             <span class="player-author-name">${escapeText(displayName || handle)}</span>
+             ${handle && displayName && displayName !== `@${handle}` ? `<span class="player-author-handle">@${escapeText(handle)}</span>` : ''}
+           </span>
+         </span>`
+      : `<span class="player-author">
+           <span class="player-avatar player-avatar-plain" aria-hidden="true"></span>
+           <span class="player-author-text"><span class="player-author-name">Unknown author</span></span>
+         </span>`;
+
     this.metaEl.innerHTML = `
       <div class="player-meta-row">
-        <span class="player-user">${escapeText(user)}</span>
-        <span class="player-count">${this.index + 1} / ${this.items.length}</span>
+        ${authorBlock}
+        <span class="player-meta-side">
+          ${platform ? `<span class="player-platform">${escapeText(platform)}</span>` : ''}
+          <span class="player-count">${this.index + 1} / ${this.items.length}</span>
+        </span>
       </div>
       ${when ? `<div class="player-when">${escapeText(when)}</div>` : ''}
       ${cap}

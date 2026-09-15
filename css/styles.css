@@ -556,8 +556,70 @@ h1 {
 .player-meta-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 1rem;
+}
+
+.player-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.player-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
   font-weight: 700;
+  color: #fff;
+  background: var(--ig-gradient);
+  flex-shrink: 0;
+}
+
+.player-avatar-plain {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.player-author-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.player-author-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-author-handle {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.player-meta-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.player-platform {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .player-count,
@@ -938,6 +1000,25 @@ h1 {
   margin: 0.2rem 0 0;
   color: var(--ink-secondary);
   font-size: 0.85rem;
+}
+
+.footer-meta {
+  text-align: right;
+}
+
+.footer-meta a {
+  color: var(--ink-secondary);
+  font-weight: 600;
+}
+
+.footer-meta a:hover {
+  color: var(--fb);
+}
+
+@media (max-width: 560px) {
+  .footer-meta {
+    text-align: left;
+  }
 }
 
 /* toast */

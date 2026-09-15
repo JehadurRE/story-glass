@@ -11,7 +11,12 @@ export async function resolveFacebook(parsed) {
   // 1) Worker /api/resolve — proven path for public watch/videos links
   const viaRelay = await resolveViaRelay(target);
   if (viaRelay.ok && viaRelay.items?.length) {
-    return { ok: true, items: viaRelay.items, via: `relay:${viaRelay.source || 'resolve'}` };
+    return {
+      ok: true,
+      items: viaRelay.items,
+      via: `relay:${viaRelay.source || 'resolve'}`,
+      page: viaRelay.page || null,
+    };
   }
 
   // 2) Client-side HTML mine through public CORS proxies

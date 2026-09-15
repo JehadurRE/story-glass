@@ -100,7 +100,13 @@ function setPlatformBadge(platform, kind) {
 }
 
 function applyItems(items, meta = {}) {
-  lastItems = items;
+  const author = meta.author || {};
+  lastItems = items.map((item) => ({
+    ...item,
+    username: item.username || author.username || '',
+    authorName: item.authorName || author.name || '',
+    platform: item.platform || author.platform || '',
+  }));
   showResult(true);
   els.player.hidden = false;
   if (meta.badge) {
@@ -108,8 +114,14 @@ function applyItems(items, meta = {}) {
     els.platformBadge.textContent = meta.badge;
     els.platformBadge.className = `platform-badge ${meta.badgeCls || 'badge-manual'}`;
   }
-  els.hint.innerHTML = meta.hint || `${items.length} segment(s)`;
-  player.setItems(items);
+  const authorLine =
+    author.name || author.username
+      ? `<strong>${escapeHtml(author.name || author.username)}</strong>`
+      : '';
+  els.hint.innerHTML =
+    meta.hint ||
+    (authorLine ? `${authorLine} · ${items.length} segment(s)` : `${items.length} segment(s)`);
+  player.setItems(lastItems);
   player.startKeyboard();
   updateActionButtons();
 }
@@ -152,10 +164,19 @@ async function runLookup(raw) {
     }
 
     setStatus('');
+    const author = {
+      username: parsed.username || outcome.items?.[0]?.username || '',
+      name: outcome.page?.title || outcome.items?.[0]?.authorName || '',
+      platform:
+        parsed.platform === PLATFORMS.INSTAGRAM
+          ? 'Instagram'
+          : parsed.platform === PLATFORMS.FACEBOOK
+            ? 'Facebook'
+            : '',
+    };
     applyItems(outcome.items, {
-      hint: outcome.via
-        ? `${outcome.items.length} segment(s)`
-        : `${outcome.items.length} segment(s)`,
+      author,
+      hint: outcome.items.length === 1 ? '1 segment' : `${outcome.items.length} segments`,
     });
   } finally {
     setBusy(false);

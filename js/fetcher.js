@@ -229,6 +229,7 @@ export async function resolveViaRelay(targetUrl) {
           via: endpoint.id,
           items: json.items,
           source: json.source || endpoint.id,
+          page: json.page || null,
         };
       }
       lastError = (json && json.error) || 'Could not load media for this link.';
