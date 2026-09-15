@@ -8,8 +8,10 @@
       name="description"
       content="View public Facebook and Instagram stories in your browser. No account, no app. Paste a link and watch."
     />
-    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#fafafa" />
+    <meta name="color-scheme" content="light" />
     <link rel="stylesheet" href="./css/styles.css" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='1' x2='1' y2='0'%3E%3Cstop stop-color='%23833AB4'/%3E%3Cstop offset='.5' stop-color='%23E1306C'/%3E%3Cstop offset='1' stop-color='%23FCAF45'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='white' stroke-width='2.5'/%3E%3C/svg%3E" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -23,154 +25,255 @@
     </script>
   </head>
   <body>
+    <div class="bg-mesh" aria-hidden="true"></div>
+
     <header class="site-header">
-      <div class="site-header-inner">
-        <a class="wordmark" href="./" aria-label="StoryGlass home">
-          <span class="wordmark-mark" aria-hidden="true"></span>
-          StoryGlass
+      <div class="shell header-inner">
+        <a class="brand" href="./" aria-label="StoryGlass home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="28" height="28">
+              <defs>
+                <linearGradient id="brandGrad" x1="0" y1="1" x2="1" y2="0">
+                  <stop stop-color="#833AB4" />
+                  <stop offset="0.5" stop-color="#E1306C" />
+                  <stop offset="1" stop-color="#FCAF45" />
+                </linearGradient>
+              </defs>
+              <rect width="32" height="32" rx="9" fill="url(#brandGrad)" />
+              <circle cx="16" cy="16" r="7" fill="none" stroke="#fff" stroke-width="2.4" />
+              <circle cx="23" cy="9" r="1.8" fill="#fff" />
+            </svg>
+          </span>
+          <span class="brand-text">StoryGlass</span>
         </a>
-        <nav class="header-nav" aria-label="Page">
+        <nav class="header-nav" aria-label="Primary">
           <a href="#how">How it works</a>
           <a href="#faq">FAQ</a>
+          <a class="nav-cta" href="#lookup-form">View a story</a>
         </nav>
       </div>
     </header>
 
     <main>
-      <section class="hero">
-        <p class="eyebrow">Facebook · Instagram · no sign-up</p>
-        <h1>View public stories in your browser</h1>
-        <p class="lede">
-          Copy a story or video link, paste it here, and watch. Works on phone and desktop.
-          No StoryGlass account. No app install.
-        </p>
+      <section class="hero shell">
+        <div class="hero-copy">
+          <p class="pill">
+            <span class="pill-dot"></span>
+            Facebook &amp; Instagram · free · no sign-up
+          </p>
+          <h1>
+            Watch public stories
+            <span class="grad-text">without the app</span>
+          </h1>
+          <p class="lede">
+            Paste a story, reel, or page video link. StoryGlass loads it in a clean story player —
+            phone or desktop, no account required.
+          </p>
+          <div class="platform-row" aria-label="Supported platforms">
+            <span class="chip chip-ig">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2" />
+                <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2" />
+                <circle cx="17.5" cy="6.5" r="1.2" fill="currentColor" />
+              </svg>
+              Instagram
+            </span>
+            <span class="chip chip-fb">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path
+                  d="M14 8h3V4h-3c-2.8 0-5 2.2-5 5v2H6v4h3v8h4v-8h3.1l.9-4H13V9c0-.6.4-1 1-1z"
+                />
+              </svg>
+              Facebook
+            </span>
+          </div>
+        </div>
+
+        <div class="lookup-card">
+          <form id="lookup-form" autocomplete="off" class="lookup-form">
+            <label class="sr-only" for="url-input">Story or video URL</label>
+            <div class="url-bar">
+              <span class="url-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M10 13a5 5 0 0 0 7.07 0l1.41-1.41a5 5 0 0 0-7.07-7.07L10 5.93"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                  />
+                  <path
+                    d="M14 11a5 5 0 0 0-7.07 0L5.5 12.43a5 5 0 0 0 7.07 7.07L14 18.07"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </span>
+              <input
+                id="url-input"
+                name="url"
+                type="url"
+                inputmode="url"
+                spellcheck="false"
+                placeholder="Paste Instagram or Facebook link…"
+              />
+              <button type="button" class="icon-btn" id="clear-input" title="Clear" aria-label="Clear">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+              </button>
+              <button type="button" class="icon-btn" id="paste-clip" title="Paste" aria-label="Paste">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <rect x="8" y="3" width="8" height="4" rx="1" stroke="currentColor" stroke-width="1.8" />
+                  <path
+                    d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                  />
+                </svg>
+              </button>
+            </div>
+            <button type="submit" class="btn-primary" id="submit-btn">
+              <span class="btn-label">View story</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M5 12h14M13 6l6 6-6 6"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+          </form>
+          <p class="lookup-hint">
+            Works best with story, reel, <code>/watch/?v=</code>, or page video links.
+          </p>
+          <p class="status" id="status" hidden></p>
+        </div>
       </section>
 
-      <form class="lookup" id="lookup-form" autocomplete="off">
-        <div class="lookup-row">
-          <div class="field">
-            <span class="field-prefix">URL</span>
-            <input
-              id="url-input"
-              name="url"
-              type="url"
-              inputmode="url"
-              spellcheck="false"
-              placeholder="https://www.instagram.com/stories/username/123…"
-              aria-label="Story or video URL"
-            />
+      <div class="shell">
+        <div id="error-box" class="error-card" hidden></div>
+      </div>
+
+      <section class="shell result" id="result" hidden>
+        <div class="result-toolbar">
+          <div class="result-meta">
+            <span class="platform-badge" id="platform-badge" hidden></span>
+            <span class="hint" id="result-hint"></span>
           </div>
-          <button type="button" class="btn" id="clear-input" title="Clear">Clear</button>
-          <button type="button" class="btn" id="paste-clip" title="Paste">Paste</button>
-          <button type="submit" class="btn btn-primary" id="submit-btn">View story</button>
-        </div>
-        <p class="status" id="status" hidden></p>
-      </form>
-
-      <div id="error-box" class="error-box" hidden></div>
-
-      <section class="result" id="result" hidden>
-        <div class="result-head">
-          <span class="platform-badge" id="platform-badge" hidden></span>
-          <span class="hint" id="result-hint"></span>
+          <div class="result-actions">
+            <button type="button" class="btn-ghost" id="download-current" disabled>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 4v12M6 12l6 6 6-6M5 20h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              Save
+            </button>
+            <button type="button" class="btn-ghost" id="open-current" disabled>
+              Open
+            </button>
+            <button type="button" class="btn-text" id="demo-load">Demo</button>
+          </div>
         </div>
 
         <div class="player-shell" id="story-player" hidden>
-          <div class="player-rail" id="player-rail" aria-hidden="true"></div>
-          <div class="player-meta" id="player-meta"></div>
-          <div class="player-media" id="player-media"></div>
-          <div class="player-actions">
-            <button type="button" class="btn btn-primary" id="download-current" disabled>Save</button>
-            <button type="button" class="btn" id="open-current" disabled>Open</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="demo-load">Demo</button>
+          <div class="player-chrome">
+            <div class="player-rail" id="player-rail" aria-hidden="true"></div>
+            <div class="player-meta" id="player-meta"></div>
+            <div class="player-media" id="player-media"></div>
           </div>
         </div>
       </section>
 
-      <div class="sections">
-        <article class="section-card" id="how">
-          <h2>How to use</h2>
-          <div class="steps">
-            <div class="step">
-              <span class="step-num">01</span>
-              <div>
-                <strong>Copy the link</strong>
-                In Instagram or Facebook, open the story or video → Share → Copy link.
-              </div>
-            </div>
-            <div class="step">
-              <span class="step-num">02</span>
-              <div>
-                <strong>Paste and view</strong>
-                Drop it in the box above and hit <em>View story</em>.
-              </div>
-            </div>
-            <div class="step">
-              <span class="step-num">03</span>
-              <div>
-                <strong>Watch or save</strong>
-                Use the rail to step through segments. Save only content you own or may keep.
-              </div>
-            </div>
-          </div>
-        </article>
+      <section class="shell features" id="how">
+        <div class="section-head">
+          <p class="eyebrow">How it works</p>
+          <h2>Three steps. That’s it.</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <div class="feature-num">01</div>
+            <h3>Copy the link</h3>
+            <p>Open the story or video → Share → Copy link. Full URL, not just a username.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-num">02</div>
+            <h3>Paste &amp; view</h3>
+            <p>Drop it in the box above. We resolve media and open a story-style player.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-num">03</div>
+            <h3>Watch or save</h3>
+            <p>Step through segments with the rail. Save only what you own or may keep.</p>
+          </article>
+        </div>
+      </section>
 
-        <article class="section-card" id="privacy">
-          <h2>What you should know</h2>
-          <p>
-            You do not need a StoryGlass account. We do not store your media on our servers for
-            playback — files stream from the platform CDNs when available.
-          </p>
-          <p>
-            Private or expired stories usually cannot be loaded. This is not a way around login walls
-            or audience limits. Instagram may still count views toward the creator depending on how
-            the content is fetched.
-          </p>
+      <section class="shell info-grid">
+        <article class="info-card" id="privacy">
+          <h2>Good to know</h2>
+          <ul class="check-list">
+            <li>No StoryGlass account — ever</li>
+            <li>No app install required</li>
+            <li>Private or expired content usually won’t load</li>
+            <li>Not a way around login walls or audience limits</li>
+          </ul>
         </article>
-
-        <article class="section-card" id="faq">
+        <article class="info-card" id="faq">
           <h2>FAQ</h2>
-          <h3>Do I need to sign up?</h3>
-          <p>No. Paste a public link and watch.</p>
-          <h3>Which links work best?</h3>
-          <p>
-            Facebook public videos (<code>/watch/?v=</code>, <code>/videos/</code>) and Instagram
-            story links that include a media id. Profile-only links are harder.
-          </p>
-          <h3>Why did it fail?</h3>
-          <p>
-            The story may be private, deleted, or past ~24 hours. Copy the full link again (not just
-            a username). You can also open <em>Having trouble?</em> and paste page source.
-          </p>
-          <h3>Does it work on iPhone / Android?</h3>
-          <p>Yes — any modern mobile browser.</p>
+          <dl class="faq">
+            <div>
+              <dt>Do I need to sign up?</dt>
+              <dd>No. Paste a public link and watch.</dd>
+            </div>
+            <div>
+              <dt>Which links work best?</dt>
+              <dd>Facebook videos, page video tabs, Instagram story links with a media id.</dd>
+            </div>
+            <div>
+              <dt>Why did it fail?</dt>
+              <dd>Story may be private, deleted, or older than ~24 hours. Try the full share link again.</dd>
+            </div>
+            <div>
+              <dt>Mobile?</dt>
+              <dd>Yes — any modern phone browser.</dd>
+            </div>
+          </dl>
         </article>
-
-        <article class="section-card" id="trouble">
-          <h2>Having trouble?</h2>
+        <article class="info-card info-card-wide" id="trouble">
+          <div class="info-card-head">
+            <h2>Having trouble?</h2>
+            <button type="button" class="btn-ghost btn-sm" id="manual-toggle" aria-expanded="false">
+              Open paste box
+            </button>
+          </div>
           <p>
-            If auto-load fails, open the media or story page in another tab, copy the page source or
-            JSON, and paste it below. We only parse — we do not need your login.
+            If auto-load fails, open the media page in another tab, copy page source or JSON, and paste
+            it below. We only parse — no login needed.
           </p>
-          <button type="button" class="btn btn-sm" id="manual-toggle" aria-expanded="false">
-            Open paste box
-          </button>
           <div class="manual-panel" id="manual-panel" hidden>
             <label class="sr-only" for="manual-text">JSON or HTML</label>
-            <textarea id="manual-text" placeholder='Paste page source or JSON with media URLs'></textarea>
-            <div style="margin-top: 0.75rem">
-              <button type="button" class="btn btn-primary" id="manual-submit">Load pasted media</button>
+            <textarea id="manual-text" placeholder="Paste page source or JSON with media URLs"></textarea>
+            <div class="manual-actions">
+              <button type="button" class="btn-primary" id="manual-submit">Load pasted media</button>
             </div>
           </div>
         </article>
-      </div>
+      </section>
     </main>
 
-    <footer>
-      <p>
-        <strong>StoryGlass</strong> — personal / educational use. Respect creators and platform terms.
-      </p>
-      <p>Static app + built-in resolve API · no visitor accounts</p>
+    <footer class="site-footer">
+      <div class="shell footer-inner">
+        <div class="footer-brand">
+          <span class="brand-mark-sm" aria-hidden="true"></span>
+          <div>
+            <strong>StoryGlass</strong>
+            <p>Personal / educational use. Respect creators and platform terms.</p>
+          </div>
+        </div>
+        <p class="footer-note">No visitor accounts · Built-in resolve API</p>
+      </div>
     </footer>
 
     <div class="toast" id="toast" hidden role="status"></div>

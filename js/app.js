@@ -50,7 +50,9 @@ function setStatus(text, tone = '') {
 function setBusy(on) {
   busy = on;
   els.submitBtn.disabled = on;
-  els.submitBtn.textContent = on ? 'Loading…' : 'View story';
+  const label = els.submitBtn.querySelector('.btn-label');
+  if (label) label.textContent = on ? 'Loading…' : 'View story';
+  else els.submitBtn.textContent = on ? 'Loading…' : 'View story';
 }
 
 function toast(msg, ms = 2800) {
