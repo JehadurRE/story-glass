@@ -1,12 +1,11 @@
 /**
  * Generates standards-compliant PNG icons and ICO files for StoryGlass.
- * Uses pure Node.js built-in modules (zlib, fs).
+ * Renders a vibrant, high-luminosity gradient with bold white glass optics.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
-// Table for CRC-32
 const crcTable = new Uint32Array(256);
 for (let n = 0; n < 256; n++) {
   let c = n;
@@ -35,8 +34,6 @@ function makePngChunk(type, data) {
 
 function encodePng(width, height, rgbaBuffer) {
   const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-  // IHDR: width(4), height(4), bitDepth(1)=8, colorType(1)=6(RGBA), comp(1)=0, filter(1)=0, interlace(1)=0
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
@@ -46,7 +43,6 @@ function encodePng(width, height, rgbaBuffer) {
   ihdr[11] = 0;
   ihdr[12] = 0;
 
-  // Scanlines with filter byte 0 (None)
   const rowBytes = width * 4;
   const scanlines = Buffer.alloc(height * (rowBytes + 1));
   for (let y = 0; y < height; y++) {
@@ -66,11 +62,10 @@ function encodePng(width, height, rgbaBuffer) {
 }
 
 function encodeIco(pngBuffers) {
-  // ICO header: 6 bytes
   const header = Buffer.alloc(6);
-  header.writeUInt16LE(0, 0); // Reserved
-  header.writeUInt16LE(1, 2); // Type: 1 = icon
-  header.writeUInt16LE(pngBuffers.length, 4); // Count
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(pngBuffers.length, 4);
 
   let offset = 6 + pngBuffers.length * 16;
   const dirEntries = [];
@@ -78,12 +73,12 @@ function encodeIco(pngBuffers) {
     const entry = Buffer.alloc(16);
     entry[0] = width >= 256 ? 0 : width;
     entry[1] = height >= 256 ? 0 : height;
-    entry[2] = 0; // Colors
-    entry[3] = 0; // Reserved
-    entry.writeUInt16LE(1, 4); // Color planes
-    entry.writeUInt16LE(32, 6); // Bits per pixel
-    entry.writeUInt32LE(buffer.length, 8); // Size
-    entry.writeUInt32LE(offset, 12); // Offset
+    entry[2] = 0;
+    entry[3] = 0;
+    entry.writeUInt16LE(1, 4);
+    entry.writeUInt16LE(32, 6);
+    entry.writeUInt32LE(buffer.length, 8);
+    entry.writeUInt32LE(offset, 12);
     dirEntries.push(entry);
     offset += buffer.length;
   }
@@ -91,47 +86,49 @@ function encodeIco(pngBuffers) {
   return Buffer.concat([header, ...dirEntries, ...pngBuffers.map((p) => p.buffer)]);
 }
 
-// Draw StoryGlass icon into an RGBA pixel buffer
+// Draw vibrant, light, highly visible StoryGlass icon
 function renderStoryGlassIcon(size) {
   const buf = Buffer.alloc(size * size * 4);
 
-  // Gradient stops: #833AB4 (131,58,180) -> #E1306C (225,48,108) -> #FCAF45 (252,175,69)
+  // Gradient stops:
+  // 0.00: #7928CA (121, 40, 202) - Violet
+  // 0.28: #C13584 (193, 53, 132) - Magenta
+  // 0.55: #FF0080 (255, 0, 128) - Hot Pink
+  // 0.80: #FF4B2B (255, 75, 43) - Coral Red
+  // 1.00: #FFB800 (255, 184, 0) - Amber Yellow
   function getGradientColor(t) {
-    if (t < 0.5) {
-      const u = t / 0.5;
-      return [
-        Math.round(131 + (225 - 131) * u),
-        Math.round(58 + (48 - 58) * u),
-        Math.round(180 + (108 - 180) * u),
-      ];
+    if (t < 0.28) {
+      const u = t / 0.28;
+      return [Math.round(121 + (193 - 121) * u), Math.round(40 + (53 - 40) * u), Math.round(202 + (132 - 202) * u)];
+    } else if (t < 0.55) {
+      const u = (t - 0.28) / 0.27;
+      return [Math.round(193 + (255 - 193) * u), Math.round(53 + (0 - 53) * u), Math.round(132 + (128 - 132) * u)];
+    } else if (t < 0.80) {
+      const u = (t - 0.55) / 0.25;
+      return [255, Math.round(0 + (75 - 0) * u), Math.round(128 + (43 - 128) * u)];
     } else {
-      const u = (t - 0.5) / 0.5;
-      return [
-        Math.round(225 + (252 - 225) * u),
-        Math.round(48 + (175 - 48) * u),
-        Math.round(108 + (69 - 108) * u),
-      ];
+      const u = (t - 0.80) / 0.20;
+      return [255, Math.round(75 + (184 - 75) * u), Math.round(43 + (0 - 43) * u)];
     }
   }
 
   const cx = size / 2;
   const cy = size / 2;
-  const rOuter = size * 0.44;
-  const rInner = size * 0.38;
-  const rAperture = size * 0.22;
-  const apertureWidth = Math.max(1.5, size * 0.05);
-  const rCore = size * 0.14;
+  const strokeW = Math.max(1.4, size * 0.075);
+  const lensR = size * 0.17;
+  const camHalf = size * 0.30;
+  const camR = size * 0.16;
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const idx = (y * size + x) * 4;
 
-      // Squircle distance approximation
-      const dx = Math.abs(x - cx) / (size * 0.46);
-      const dy = Math.abs(y - cy) / (size * 0.46);
+      // Squircle outer boundary (fills frame with sleek rounded corners)
+      const dx = Math.abs(x - cx) / (size * 0.48);
+      const dy = Math.abs(y - cy) / (size * 0.48);
       const squircleDist = Math.pow(Math.pow(dx, 4) + Math.pow(dy, 4), 0.25);
 
-      if (squircleDist > 1.05) {
+      if (squircleDist > 1.04) {
         // Transparent outside
         buf[idx] = 0;
         buf[idx + 1] = 0;
@@ -140,66 +137,62 @@ function renderStoryGlassIcon(size) {
         continue;
       }
 
-      // Base squircle dark glass body
-      let r = 14;
-      let g = 17;
-      let b = 24;
+      // Base: Radiant sunset gradient
+      const gradT = (x + (size - y)) / (size * 2);
+      const [gr, gg, gb] = getGradientColor(Math.max(0, Math.min(1, gradT)));
+
+      let r = gr;
+      let g = gg;
+      let b = gb;
       let a = 255;
 
-      // Anti-aliased outer edge
-      if (squircleDist > 0.96) {
-        const edgeAlpha = Math.max(0, Math.min(1, (1.05 - squircleDist) / 0.09));
+      // Anti-aliased edge
+      if (squircleDist > 0.94) {
+        const edgeAlpha = Math.max(0, Math.min(1, (1.04 - squircleDist) / 0.10));
         a = Math.round(255 * edgeAlpha);
       }
 
-      // Gradient story border
-      if (squircleDist <= 0.98 && squircleDist >= 0.82) {
-        const t = (x + y) / (size * 2);
-        const [gr, gg, gb] = getGradientColor(t);
-        r = gr;
-        g = gg;
-        b = gb;
+      // Top glass highlight sheen (brightens the top 45%)
+      if (y < size * 0.45) {
+        const sheen = (1 - y / (size * 0.45)) * 0.32;
+        r = Math.min(255, Math.round(r + (255 - r) * sheen));
+        g = Math.min(255, Math.round(g + (255 - g) * sheen));
+        b = Math.min(255, Math.round(b + (255 - b) * sheen));
       }
 
-      // Radial distance from center
+      // Camera Box Rounded Rect distance
+      const cdx = Math.max(0, Math.abs(x - cx) - (camHalf - camR));
+      const cdy = Math.max(0, Math.abs(y - cy) - (camHalf - camR));
+      const camDist = Math.hypot(cdx, cdy);
+      const isCamBorder = Math.abs(camDist - camR) < strokeW / 2;
+
+      // Center Circle Lens distance
       const distFromCenter = Math.hypot(x - cx, y - cy);
+      const isLensRing = Math.abs(distFromCenter - lensR) < strokeW / 2;
 
-      // Camera ring / Story aperture
-      if (Math.abs(distFromCenter - rAperture) < apertureWidth) {
-        const t = 1 - (x + (size - y)) / (size * 2);
-        const [gr, gg, gb] = getGradientColor(Math.max(0, Math.min(1, t)));
-        r = gr;
-        g = gg;
-        b = gb;
-      } else if (distFromCenter < rCore) {
-        // Inner optic lens (cyan/blue tint reflection)
-        r = Math.round(18 + 10 * (x / size));
-        g = Math.round(119 + 60 * (1 - y / size));
-        b = Math.round(242);
-      }
-
-      // Active story indicator / glint at top right
-      const glintX = cx + size * 0.24;
-      const glintY = cy - size * 0.24;
+      // Active Story Glint / Flash Dot at top right
+      const glintX = cx + size * 0.20;
+      const glintY = cy - size * 0.19;
       const distGlint = Math.hypot(x - glintX, y - glintY);
-      const glintR = Math.max(1.5, size * 0.05);
-      if (distGlint < glintR) {
-        r = 252;
-        g = 175;
-        b = 69;
-      } else if (distGlint < glintR * 1.5) {
+      const glintR = Math.max(1.2, size * 0.05);
+
+      if (isCamBorder || isLensRing || distGlint < glintR) {
+        // Pure crisp, luminous white (#FFFFFF)
         r = 255;
         g = 255;
         b = 255;
-      }
+      } else if (distFromCenter < lensR - strokeW / 2) {
+        // Inner optical prism core (Facebook Cyan/Blue reflection)
+        const tint = 0.45;
+        r = Math.round(r * (1 - tint) + 24 * tint);
+        g = Math.round(g * (1 - tint) + 180 * tint);
+        b = Math.round(b * (1 - tint) + 254 * tint);
 
-      // Diagonal glass specular reflection sheen
-      if (y > size * 0.15 && y < size * 0.38) {
-        const sheenDist = Math.abs((x - y) - size * 0.05);
-        if (sheenDist < size * 0.15) {
-          r = Math.min(255, r + 40);
-          g = Math.min(255, g + 40);
-          b = Math.min(255, b + 45);
+        // Crescent glass reflection highlight inside lens
+        if (y < cy - size * 0.02 && x < cx + size * 0.06) {
+          r = Math.min(255, r + 90);
+          g = Math.min(255, g + 90);
+          b = Math.min(255, b + 90);
         }
       }
 
@@ -229,12 +222,12 @@ for (const { name, size } of sizes) {
   fs.writeFileSync(path.join('assets', name), png);
   console.log(`Generated assets/${name} (${size}x${size}, ${png.length} bytes)`);
 
-  if (size === 16 || size === 32 || size === 48) {
+  if (size === 16 || size === 32) {
     pngIconsForIco.push({ width: size, height: size, buffer: png });
   }
 }
 
-// Generate favicon-48x48 for ICO
+// Generate 48x48 for ICO
 const rgba48 = renderStoryGlassIcon(48);
 const png48 = encodePng(48, 48, rgba48);
 pngIconsForIco.push({ width: 48, height: 48, buffer: png48 });
@@ -244,6 +237,6 @@ const ico = encodeIco(pngIconsForIco);
 fs.writeFileSync('favicon.ico', ico);
 console.log(`Generated favicon.ico (${ico.length} bytes)`);
 
-// Also save apple-touch-icon.png in root as well as assets/
+// Save apple-touch-icon.png in root as well
 fs.copyFileSync(path.join('assets', 'apple-touch-icon.png'), 'apple-touch-icon.png');
 console.log('Copied apple-touch-icon.png to root');

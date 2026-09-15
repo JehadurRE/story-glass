@@ -124,22 +124,43 @@ for (let y = 0; y < H; y++) {
     if (ix >= 0 && ix < isize && iy >= 0 && iy < isize) {
       const icx = isize / 2;
       const icy = isize / 2;
-      const dx = Math.abs(ix - icx) / (isize * 0.46);
-      const dy = Math.abs(iy - icy) / (isize * 0.46);
+      const dx = Math.abs(ix - icx) / (isize * 0.48);
+      const dy = Math.abs(iy - icy) / (isize * 0.48);
       const sDist = Math.pow(Math.pow(dx, 4) + Math.pow(dy, 4), 0.25);
       if (sDist <= 1.0) {
-        if (sDist >= 0.82 && sDist <= 0.98) {
-          const [gr, gg, gb] = getIgGradient((ix + iy) / (isize * 2));
-          r = gr; g = gg; b = gb;
-        } else {
-          r = 18; g = 22; b = 32;
+        const gradT = (ix + (isize - iy)) / (isize * 2);
+        const [gr, gg, gb] = getIgGradient(Math.max(0, Math.min(1, gradT)));
+        r = gr; g = gg; b = gb;
+
+        if (iy < isize * 0.45) {
+          const sheen = (1 - iy / (isize * 0.45)) * 0.32;
+          r = Math.min(255, Math.round(r + (255 - r) * sheen));
+          g = Math.min(255, Math.round(g + (255 - g) * sheen));
+          b = Math.min(255, Math.round(b + (255 - b) * sheen));
         }
+
+        const strokeW = Math.max(2.5, isize * 0.075);
+        const camHalf = isize * 0.30;
+        const camR = isize * 0.16;
+        const cdx = Math.max(0, Math.abs(ix - icx) - (camHalf - camR));
+        const cdy = Math.max(0, Math.abs(iy - icy) - (camHalf - camR));
+        const camDist = Math.hypot(cdx, cdy);
+        const isCamBorder = Math.abs(camDist - camR) < strokeW / 2;
+
         const distCenter = Math.hypot(ix - icx, iy - icy);
-        if (Math.abs(distCenter - isize * 0.22) < isize * 0.05) {
-          const [gr, gg, gb] = getIgGradient(1 - (ix + iy) / (isize * 2));
-          r = gr; g = gg; b = gb;
-        } else if (distCenter < isize * 0.14) {
-          r = 24; g = 119; b = 242;
+        const lensR = isize * 0.17;
+        const isLensRing = Math.abs(distCenter - lensR) < strokeW / 2;
+
+        const glintX = icx + isize * 0.20;
+        const glintY = icy - isize * 0.19;
+        const isGlint = Math.hypot(ix - glintX, iy - glintY) < Math.max(2, isize * 0.05);
+
+        if (isCamBorder || isLensRing || isGlint) {
+          r = 255; g = 255; b = 255;
+        } else if (distCenter < lensR - strokeW / 2) {
+          r = Math.round(r * 0.5 + 24 * 0.5);
+          g = Math.round(g * 0.5 + 180 * 0.5);
+          b = Math.round(b * 0.5 + 254 * 0.5);
         }
       }
     }
